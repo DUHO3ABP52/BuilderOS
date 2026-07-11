@@ -18,15 +18,16 @@
 - email: `admin@example.com`
 - password: `change-me`
 
-## Что уже есть (0.4.0-alpha)
+## Что уже есть (0.5.0-alpha)
 
 - Docker: API, PostgreSQL, Redis, MinIO, Qdrant, Ollama, Frontend
 - JWT-авторизация и первый пользователь
 - Компании и строительные объекты с архивированием
 - Document Engine: `BuilderDocument`, секции, переменные, DOCX/PDF/HTML
-- Реестр шаблонов, импорт DOCX, версии документов
+- **Импорт образцов**: DOCX / PDF / TXT / фото → шаблон (OCR)
+- Реестр шаблонов, версии, обучение на правках
 - Библиотека блоков договора
-- База знаний + **RAG-поиск** (Qdrant + embeddings)
+- База знаний + RAG-поиск (Qdrant + embeddings)
 - AI Core: Coordinator, Document / Knowledge / Memory / Task agents
 - Локальная LLM (Ollama) + опциональный OmniRoute (hybrid)
 - Задачи и корпоративная память
@@ -41,4 +42,4 @@
 - `добавь задачу подписать акт`
 - `запомни: гарантия всегда 24 месяца`
 
-Подробности: [docs/ROADMAP.md](docs/ROADMAP.md), [docs/PROJECT.md](docs/PROJECT.md), [docs/LLM.md](docs/LLM.md), [docs/RAG.md](docs/RAG.md).
+Подробности: [docs/ROADMAP.md](docs/ROADMAP.md), [docs/PROJECT.md](docs/PROJECT.md), [docs/LLM.md](docs/LLM.md), [docs/RAG.md](docs/RAG.md), [docs/SAMPLES.md](docs/SAMPLES.md).

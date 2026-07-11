@@ -8,7 +8,10 @@ const state = {
 };
 
 async function api(path, options = {}) {
-  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  const headers = { ...(options.headers || {}) };
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = headers["Content-Type"] || "application/json";
+  }
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
   const response = await fetch(`${API}${path}`, { ...options, headers });
   if (response.status === 401) {
@@ -356,29 +359,80 @@ function renderProjects() {
 
 function renderTemplates() {
   const items = state.data.templates || [];
+  const preview = state.data.templatePreview || null;
   const content = el(`
-    <div class="panel">
-      <h2>Реестр шаблонов</h2>
-      <table class="table">
-        <thead><tr><th>Название</th><th>Категория</th><th>Версия</th><th>Slug</th></tr></thead>
-        <tbody>
-          ${items
-            .map(
-              (item) => `
+    <div class="grid">
+      <div class="panel">
+        <h2>Загрузить образец → шаблон</h2>
+        <p class="muted">DOCX, PDF, TXT или фото договора. Система разберёт текст, найдёт переменные и создаст шаблон.</p>
+        <form id="sample-form" class="form-grid">
+          <input class="full" type="file" name="file" accept=".docx,.pdf,.txt,.md,.png,.jpg,.jpeg,.webp,.tif,.tiff" required />
+          <input name="name" placeholder="Название шаблона (необязательно)" />
+          <select name="category">
+            <option value="">Авто</option>
+            <option value="contract">Договор</option>
+            <option value="act">Акт</option>
+            <option value="estimate">Смета</option>
+            <option value="letter">Письмо</option>
+            <option value="other">Другое</option>
+          </select>
+          <div class="full actions">
+            <button type="button" class="secondary" id="preview-sample-btn">Предпросмотр</button>
+            <button type="submit">Создать шаблон</button>
+          </div>
+        </form>
+        ${
+          preview
+            ? `<div class="muted" style="margin-top:1rem">
+                Формат: ${preview.source_format} · тип: ${preview.doc_type} · переменных: ${(preview.variables || []).length}
+                ${(preview.warnings || []).length ? `<div>Предупреждения: ${preview.warnings.join("; ")}</div>` : ""}
+                <pre style="white-space:pre-wrap;max-height:180px;overflow:auto;background:rgba(0,0,0,.2);padding:0.8rem;border-radius:12px">${preview.excerpt || ""}</pre>
+              </div>`
+            : ""
+        }
+      </div>
+      <div class="panel">
+        <h2>Реестр шаблонов</h2>
+        <table class="table">
+          <thead><tr><th>Название</th><th>Категория</th><th>Версия</th><th>Slug</th></tr></thead>
+          <tbody>
+            ${items
+              .map(
+                (item) => `
             <tr>
               <td>${item.name}</td>
               <td>${item.category}</td>
               <td>v${item.version}</td>
               <td>${item.slug}</td>
             </tr>`
-            )
-            .join("")}
-        </tbody>
-      </table>
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
     </div>
   `);
   renderShell(content);
   document.getElementById("page-title").textContent = "Шаблоны";
+  const form = content.querySelector("#sample-form");
+  content.querySelector("#preview-sample-btn").addEventListener("click", async () => {
+    const fileInput = form.querySelector('input[name="file"]');
+    if (!fileInput.files.length) throw new Error("Выберите файл");
+    const body = new FormData();
+    body.append("file", fileInput.files[0]);
+    state.data.templatePreview = await api("/templates/import/preview", { method: "POST", body });
+    renderTemplates();
+  });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    if (!data.get("file") || !data.get("file").size) throw new Error("Выберите файл");
+    if (!data.get("name")) data.delete("name");
+    if (!data.get("category")) data.delete("category");
+    await api("/templates/import/sample", { method: "POST", body: data });
+    state.data.templatePreview = null;
+    await safeLoad();
+  });
 }
 
 function renderDocuments() {

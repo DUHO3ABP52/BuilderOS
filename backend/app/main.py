@@ -36,7 +36,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.4.0-alpha",
+    version="0.5.0-alpha",
     description="Локальный цифровой сотрудник строительной компании.",
     lifespan=lifespan,
 )
@@ -52,7 +52,7 @@ app.include_router(api_router)
 
 @app.get("/", tags=["system"])
 def root() -> dict[str, str]:
-    return {"project": settings.app_name, "status": "running", "version": "0.4.0-alpha"}
+    return {"project": settings.app_name, "status": "running", "version": "0.5.0-alpha"}
 
 
 @app.get("/health", tags=["system"])

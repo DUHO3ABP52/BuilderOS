@@ -24,3 +24,9 @@ def remember_text(session: Session, text: str, user_id: UUID, project_id: UUID |
 
 def recall_text(session: Session, query: str | None = None):
     return recall(session, query=query)
+
+
+def recall_template_hints(session: Session, slug: str, limit: int = 5) -> list[str]:
+    facts = recall(session, query=f"template:{slug}", limit=20)
+    hints = [fact.content for fact in facts if fact.kind in {"pattern", "template_hint"}]
+    return hints[:limit]

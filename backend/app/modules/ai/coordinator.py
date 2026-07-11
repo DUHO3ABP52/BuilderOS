@@ -110,6 +110,8 @@ def _handle_document(session: Session, user_id: UUID, payload: AssistantRequest)
         )
 
     missing = document_agent.missing_required_variables(template, payload.variables)
+    hints = memory_agent.recall_template_hints(session, template.slug)
+    hint_text = ("\nПодсказки из памяти правок:\n- " + "\n- ".join(hints)) if hints else ""
     if missing and not payload.confirm:
         labels = ", ".join(missing)
         return AssistantResponse(
@@ -117,12 +119,17 @@ def _handle_document(session: Session, user_id: UUID, payload: AssistantRequest)
                 f"Нашёл шаблон «{template.name}» (v{template.version}). "
                 f"Не хватает данных: {labels}. Передайте variables и повторите запрос "
                 "или подтвердите создание черновика с частичными данными (confirm=true)."
+                f"{hint_text}"
             ),
             intent=IntentName.CREATE_DOCUMENT,
             agent=AgentName.DOCUMENT,
             status="needs_data",
             missing_fields=missing,
-            data={"template_id": str(template.id), "template_name": template.name},
+            data={
+                "template_id": str(template.id),
+                "template_name": template.name,
+                "learning_hints": hints,
+            },
             actions=[
                 AssistantAction(
                     type="fill_variables",
@@ -161,6 +168,7 @@ def _handle_document(session: Session, user_id: UUID, payload: AssistantRequest)
         reply=(
             f"Создал черновик «{document.title}» из шаблона «{template.name}». "
             "Добавил задачу на проверку. Можно экспортировать в DOCX/PDF."
+            f"{hint_text}"
         ),
         intent=IntentName.CREATE_DOCUMENT,
         agent=AgentName.DOCUMENT,
@@ -168,6 +176,7 @@ def _handle_document(session: Session, user_id: UUID, payload: AssistantRequest)
             "document_id": str(document.id),
             "template_id": str(template.id),
             "current_version": document.current_version,
+            "learning_hints": hints,
         },
         actions=[
             AssistantAction(

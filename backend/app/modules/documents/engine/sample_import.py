@@ -1,0 +1,152 @@
+from __future__ import annotations
+
+import logging
+import mimetypes
+from dataclasses import dataclass
+from io import BytesIO
+from pathlib import Path
+
+from app.modules.documents.engine.builder_document import BuilderDocument, VariableDefinition
+from app.modules.documents.engine.parser import parse_docx
+from app.modules.documents.engine.text_parser import detect_doc_type, parse_plain_text, templatize_document
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class SampleImportResult:
+    document: BuilderDocument
+    variables: list[VariableDefinition]
+    sample_values: dict
+    source_format: str
+    extracted_text: str
+    warnings: list[str]
+
+
+def _guess_format(filename: str | None, content_type: str | None, data: bytes) -> str:
+    name = (filename or "").lower()
+    ctype = (content_type or "").lower()
+    if name.endswith(".docx") or "wordprocessingml" in ctype:
+        return "docx"
+    if name.endswith(".pdf") or ctype == "application/pdf":
+        return "pdf"
+    if name.endswith((".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".bmp")) or ctype.startswith("image/"):
+        return "image"
+    if name.endswith((".txt", ".md")) or ctype.startswith("text/"):
+        return "text"
+    # magic bytes
+    if data[:4] == b"%PDF":
+        return "pdf"
+    if data[:2] == b"PK":
+        return "docx"
+    if data[:8] == b"\x89PNG\r\n\x1a\n" or data[:2] == b"\xff\xd8":
+        return "image"
+    return "text"
+
+
+def extract_text_from_pdf(data: bytes) -> tuple[str, list[str]]:
+    warnings: list[str] = []
+    try:
+        from pypdf import PdfReader
+    except Exception as exc:  # pragma: no cover
+        raise RuntimeError("Библиотека pypdf не установлена") from exc
+
+    reader = PdfReader(BytesIO(data))
+    pages: list[str] = []
+    for page in reader.pages:
+        text = page.extract_text() or ""
+        if text.strip():
+            pages.append(text)
+    joined = "\n".join(pages).strip()
+    if not joined:
+        warnings.append("PDF не содержит текстового слоя. Если это скан — загрузите фото страниц или PDF с OCR.")
+    return joined, warnings
+
+
+def extract_text_from_image(data: bytes) -> tuple[str, list[str]]:
+    warnings: list[str] = []
+    try:
+        from PIL import Image
+        import pytesseract
+    except Exception as exc:  # pragma: no cover
+        raise RuntimeError("Для OCR нужны Pillow и pytesseract") from exc
+
+    image = Image.open(BytesIO(data))
+    if image.mode not in {"RGB", "L"}:
+        image = image.convert("RGB")
+    try:
+        text = pytesseract.image_to_string(image, lang="rus+eng")
+    except Exception:
+        # fallback without russian traineddata
+        warnings.append("Русский OCR pack недоступен, использован eng.")
+        text = pytesseract.image_to_string(image, lang="eng")
+    cleaned = (text or "").strip()
+    if not cleaned:
+        warnings.append("OCR не распознал текст на изображении.")
+    return cleaned, warnings
+
+
+def extract_text_from_bytes(
+    data: bytes,
+    *,
+    filename: str | None = None,
+    content_type: str | None = None,
+) -> tuple[str, str, list[str]]:
+    source_format = _guess_format(filename, content_type, data)
+    warnings: list[str] = []
+
+    if source_format == "docx":
+        document = parse_docx(data)
+        text = "\n".join(f"{section.title}\n{section.content}" for section in document.sections)
+        return text, source_format, warnings
+    if source_format == "pdf":
+        text, warnings = extract_text_from_pdf(data)
+        return text, source_format, warnings
+    if source_format == "image":
+        text, warnings = extract_text_from_image(data)
+        return text, source_format, warnings
+
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        text = data.decode("cp1251", errors="ignore")
+        warnings.append("Текст декодирован как cp1251.")
+    return text, "text", warnings
+
+
+def import_sample_to_builder_document(
+    data: bytes,
+    *,
+    filename: str | None = None,
+    content_type: str | None = None,
+    title: str | None = None,
+) -> SampleImportResult:
+    text, source_format, warnings = extract_text_from_bytes(data, filename=filename, content_type=content_type)
+    if not text.strip():
+        raise ValueError("Не удалось извлечь текст из файла. Проверьте качество фото/скана.")
+
+    stem = Path(filename or "sample").stem
+    resolved_title = title or stem.replace("_", " ").replace("-", " ").strip() or "Импортированный образец"
+    doc_type = detect_doc_type(text)
+
+    if source_format == "docx":
+        base = parse_docx(data).model_copy(update={"title": resolved_title, "doc_type": doc_type})
+    else:
+        base = parse_plain_text(text, title=resolved_title, doc_type=doc_type)
+
+    templated, variables, sample_values = templatize_document(base)
+    templated.metadata = {
+        **(templated.metadata or {}),
+        "source_format": source_format,
+        "source_filename": filename,
+        "content_type": content_type or mimetypes.guess_type(filename or "")[0],
+        "warnings": warnings,
+    }
+    return SampleImportResult(
+        document=templated,
+        variables=variables,
+        sample_values=sample_values,
+        source_format=source_format,
+        extracted_text=text,
+        warnings=warnings,
+    )

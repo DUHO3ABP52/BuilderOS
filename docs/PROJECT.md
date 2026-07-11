@@ -10,23 +10,13 @@
 4. Каждое изменение документа версионируется и объясняется.
 5. Документы собираются из блоков и шаблонов, а не генерируются «с нуля».
 
-## Текущий контур (0.4.0-alpha)
+## Текущий контур (0.5.0-alpha)
 
-- Auth + Users
-- Companies / Projects
-- Document Engine (BuilderDocument, templates, blocks, export)
-- Knowledge registry + **RAG (Qdrant)**
-- AI Core: Coordinator + Document / Knowledge / Memory / Task agents
-- Tasks + Memory facts
-- Audit events
-- Web dashboard + чат помощника
-- Локальная LLM (Ollama) + опциональный OmniRoute
+- Auth, Companies, Projects, Documents, Templates, Blocks
+- Knowledge + RAG (Qdrant)
+- AI Core + локальная LLM
+- Импорт образцов (DOCX/PDF/фото) → шаблон
+- Обучение Memory на правках шаблонов
+- Tasks, Audit, Dashboard
 
-## AI / RAG
-
-- `POST /api/v1/ai/ask` — помощник
-- `GET /api/v1/ai/llm-status` — статус LLM
-- `GET /api/v1/knowledge/search?q=` — семантический + лексический поиск
-- `POST /api/v1/knowledge/reindex` — переиндексация Qdrant
-
-Подробности: [LLM.md](LLM.md), [RAG.md](RAG.md).
+Документация: [ROADMAP.md](ROADMAP.md), [RAG.md](RAG.md), [SAMPLES.md](SAMPLES.md), [LLM.md](LLM.md).
