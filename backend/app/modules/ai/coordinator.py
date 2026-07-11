@@ -201,6 +201,7 @@ def _handle_knowledge(
             or payload.message
         )
     items = knowledge_agent.search_knowledge(session, query)
+    ranked = knowledge_agent.search_knowledge_ranked(session, query)
     log_event(
         session,
         actor_id=user_id,
@@ -208,10 +209,14 @@ def _handle_knowledge(
         entity_id=None,
         action=AuditAction.UPDATE,
         summary=f"AI поиск по знаниям: {query[:120]}",
-        payload={"agent": "knowledge", "found": len(items)},
+        payload={
+            "agent": "knowledge",
+            "found": len(ranked),
+            "sources": list({row.source for row in ranked}),
+        },
     )
     session.commit()
-    if not items:
+    if not ranked:
         return AssistantResponse(
             reply=f"По запросу «{query}» в базе знаний ничего не нашёл. Добавьте СП/ГОСТ в раздел знаний.",
             intent=IntentName.SEARCH_KNOWLEDGE,
@@ -219,8 +224,12 @@ def _handle_knowledge(
             status="empty",
             data={"query": query},
         )
-    lines = [f"• {item.title} [{item.category}]" for item in items[:8]]
-    synthesized = llm_assist.synthesize_knowledge_answer(query, items)
+    lines = [
+        f"• {row.item.title} [{row.item.category}]"
+        + (f" · score={row.score:.2f}" if row.score is not None else f" · {row.source}")
+        for row in ranked[:8]
+    ]
+    synthesized = llm_assist.synthesize_knowledge_answer(query, [row.item for row in ranked])
     reply = synthesized if synthesized else ("Нашёл в базе знаний:\n" + "\n".join(lines))
     return AssistantResponse(
         reply=reply,
@@ -229,9 +238,17 @@ def _handle_knowledge(
         data={
             "query": query,
             "llm_used": bool(synthesized),
+            "rag_used": any(row.source == "rag" for row in ranked),
             "items": [
-                {"id": str(item.id), "title": item.title, "category": item.category, "excerpt": item.content[:240]}
-                for item in items[:8]
+                {
+                    "id": str(row.item.id),
+                    "title": row.item.title,
+                    "category": row.item.category,
+                    "excerpt": (row.chunk or row.item.content)[:240],
+                    "score": row.score,
+                    "source": row.source,
+                }
+                for row in ranked[:8]
             ],
         },
     )

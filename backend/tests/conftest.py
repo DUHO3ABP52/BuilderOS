@@ -14,6 +14,8 @@ os.environ["REDIS_URL"] = "redis://localhost:6379/15"
 os.environ["QDRANT_HOST"] = "localhost"
 os.environ["MINIO_ENDPOINT"] = "localhost:9000"
 os.environ["LLM_ENABLED"] = "false"
+os.environ["RAG_ENABLED"] = "true"
+os.environ["EMBEDDING_BASE_URL"] = "http://127.0.0.1:9"
 
 import pytest
 from fastapi.testclient import TestClient

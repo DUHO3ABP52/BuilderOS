@@ -469,8 +469,36 @@ function downloadBlob(blob, filename) {
 
 function renderKnowledge() {
   const items = state.data.knowledge || [];
+  const searchHits = state.data.knowledgeSearch || [];
   const content = el(`
     <div class="grid">
+      <div class="panel">
+        <h2>RAG-поиск</h2>
+        <form id="knowledge-search-form" class="form-grid">
+          <input class="full" name="q" placeholder="Например: гарантийный срок" required />
+          <div class="full actions">
+            <button type="submit">Найти</button>
+            <button type="button" class="secondary" id="reindex-btn">Переиндексировать</button>
+          </div>
+        </form>
+        <table class="table">
+          <thead><tr><th>Результат</th><th>Источник</th><th>Score</th></tr></thead>
+          <tbody>
+            ${searchHits.length
+              ? searchHits
+                  .map(
+                    (item) => `
+              <tr>
+                <td>${item.title}<div class="muted">${item.excerpt || ""}</div></td>
+                <td>${item.source}</td>
+                <td>${item.score == null ? "—" : Number(item.score).toFixed(2)}</td>
+              </tr>`
+                  )
+                  .join("")
+              : `<tr><td colspan="3" class="muted">Введите запрос для семантического поиска</td></tr>`}
+          </tbody>
+        </table>
+      </div>
       <div class="panel">
         <h2>Добавить запись</h2>
         <form id="knowledge-form" class="form-grid">
@@ -512,6 +540,17 @@ function renderKnowledge() {
         content: form.get("content"),
       }),
     });
+    await safeLoad();
+  });
+  content.querySelector("#knowledge-search-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.target);
+    const result = await api(`/knowledge/search?q=${encodeURIComponent(String(form.get("q")))}`);
+    state.data.knowledgeSearch = result.items || [];
+    renderKnowledge();
+  });
+  content.querySelector("#reindex-btn").addEventListener("click", async () => {
+    await api("/knowledge/reindex", { method: "POST" });
     await safeLoad();
   });
 }

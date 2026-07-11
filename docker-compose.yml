@@ -17,6 +17,10 @@ services:
       LLM_FALLBACK_BASE_URL: ${LLM_FALLBACK_BASE_URL:-http://omniroute:20128}
       LLM_FALLBACK_MODEL: ${LLM_FALLBACK_MODEL:-auto/cheap}
       LLM_CLOUD_FOR_KNOWLEDGE: ${LLM_CLOUD_FOR_KNOWLEDGE:-false}
+      RAG_ENABLED: ${RAG_ENABLED:-true}
+      RAG_COLLECTION: ${RAG_COLLECTION:-builderos_knowledge}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-http://ollama:11434}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -102,13 +106,16 @@ services:
     environment:
       OLLAMA_HOST: http://ollama:11434
       LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         set -e
-        echo "BuilderOS: ensuring model $$LLM_MODEL ..."
+        echo "BuilderOS: ensuring chat model $$LLM_MODEL ..."
         ollama pull "$$LLM_MODEL"
-        echo "BuilderOS: model $$LLM_MODEL ready"
+        echo "BuilderOS: ensuring embedding model $$EMBEDDING_MODEL ..."
+        ollama pull "$$EMBEDDING_MODEL"
+        echo "BuilderOS: models ready"
     restart: "no"
 
   # Опциональный бесплатный AI-gateway: docker compose --profile omniroute up

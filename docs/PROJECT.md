@@ -10,24 +10,23 @@
 4. Каждое изменение документа версионируется и объясняется.
 5. Документы собираются из блоков и шаблонов, а не генерируются «с нуля».
 
-## Текущий контур (0.3.0-alpha)
+## Текущий контур (0.4.0-alpha)
 
 - Auth + Users
 - Companies / Projects
 - Document Engine (BuilderDocument, templates, blocks, export)
-- Knowledge registry
+- Knowledge registry + **RAG (Qdrant)**
 - AI Core: Coordinator + Document / Knowledge / Memory / Task agents
 - Tasks + Memory facts
 - Audit events
 - Web dashboard + чат помощника
+- Локальная LLM (Ollama) + опциональный OmniRoute
 
-## AI Core
+## AI / RAG
 
-`POST /api/v1/ai/ask` — единая точка входа.
-`GET /api/v1/ai/llm-status` — статус локальной модели.
+- `POST /api/v1/ai/ask` — помощник
+- `GET /api/v1/ai/llm-status` — статус LLM
+- `GET /api/v1/knowledge/search?q=` — семантический + лексический поиск
+- `POST /api/v1/knowledge/reindex` — переиндексация Qdrant
 
-Координатор определяет намерение (сначала правила, при неясности — локальная LLM) и вызывает нужного агента.
-Документы создаются только из шаблонов; при нехватке данных агент запрашивает поля.
-Поиск по знаниям дополняется кратким ответом LLM по найденным фрагментам (без выдуманных норм).
-
-Локальная модель: Ollama, по умолчанию `qwen2.5:7b`. Подробности: [LLM.md](LLM.md).
+Подробности: [LLM.md](LLM.md), [RAG.md](RAG.md).

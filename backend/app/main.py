@@ -9,6 +9,7 @@ from app.db.base import Base
 from app.db.session import SessionLocal, engine
 import app.db.models  # noqa: F401
 from app.modules.auth.service import ensure_first_user
+from app.modules.knowledge.indexer import start_reindex_background
 from app.services import llm as llm_service
 from app.services.infrastructure import check_llm, check_qdrant, check_redis
 from app.services.seed import seed_default_blocks
@@ -29,12 +30,13 @@ async def lifespan(_: FastAPI):
     finally:
         session.close()
     llm_service.start_llm_warmup_background()
+    start_reindex_background(SessionLocal)
     yield
 
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.3.0-alpha",
+    version="0.4.0-alpha",
     description="Локальный цифровой сотрудник строительной компании.",
     lifespan=lifespan,
 )
@@ -50,7 +52,7 @@ app.include_router(api_router)
 
 @app.get("/", tags=["system"])
 def root() -> dict[str, str]:
-    return {"project": settings.app_name, "status": "running", "version": "0.3.0-alpha"}
+    return {"project": settings.app_name, "status": "running", "version": "0.4.0-alpha"}
 
 
 @app.get("/health", tags=["system"])

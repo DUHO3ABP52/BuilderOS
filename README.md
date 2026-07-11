@@ -6,7 +6,7 @@
 ## Быстрый запуск
 
 1. Скопируйте `.env.example` в `.env` и задайте безопасные пароли.
-2. Выполните `docker compose up --build` — вместе поднимутся приложение и Ollama (модель скачается сама).
+2. Выполните `docker compose up --build` — поднимутся приложение, Ollama и индекс знаний.
 3. Откройте UI: `http://localhost:3000`
 4. API / Swagger: `http://localhost:8000/docs`
 
@@ -18,7 +18,7 @@
 - email: `admin@example.com`
 - password: `change-me`
 
-## Что уже есть (0.3.0-alpha)
+## Что уже есть (0.4.0-alpha)
 
 - Docker: API, PostgreSQL, Redis, MinIO, Qdrant, Ollama, Frontend
 - JWT-авторизация и первый пользователь
@@ -26,7 +26,7 @@
 - Document Engine: `BuilderDocument`, секции, переменные, DOCX/PDF/HTML
 - Реестр шаблонов, импорт DOCX, версии документов
 - Библиотека блоков договора
-- База знаний + поиск через Knowledge Agent
+- База знаний + **RAG-поиск** (Qdrant + embeddings)
 - AI Core: Coordinator, Document / Knowledge / Memory / Task agents
 - Локальная LLM (Ollama) + опциональный OmniRoute (hybrid)
 - Задачи и корпоративная память
@@ -37,7 +37,8 @@
 
 - `сделай договор`
 - `найди ГОСТ`
+- `что говорит про гарантийный срок`
 - `добавь задачу подписать акт`
 - `запомни: гарантия всегда 24 месяца`
 
-Подробности: [docs/ROADMAP.md](docs/ROADMAP.md), [docs/PROJECT.md](docs/PROJECT.md), [docs/LLM.md](docs/LLM.md).
+Подробности: [docs/ROADMAP.md](docs/ROADMAP.md), [docs/PROJECT.md](docs/PROJECT.md), [docs/LLM.md](docs/LLM.md), [docs/RAG.md](docs/RAG.md).

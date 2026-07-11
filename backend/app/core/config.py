@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     # Фрагменты базы знаний уходят в облако только при явном разрешении
     llm_cloud_for_knowledge: bool = False
 
+    # RAG / Qdrant
+    rag_enabled: bool = True
+    rag_collection: str = "builderos_knowledge"
+    rag_top_k: int = 8
+    rag_score_threshold: float = 0.15
+    embedding_model: str = "nomic-embed-text"
+    embedding_dim: int = 768
+    embedding_base_url: str = ""  # пусто = llm_base_url / Ollama
+    embedding_timeout_seconds: float = 60.0
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
