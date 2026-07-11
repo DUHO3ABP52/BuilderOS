@@ -89,6 +89,12 @@ async function loadView() {
     state.data.financeSummary = await api("/finance/summary");
   } else if (state.view === "calendar") {
     state.data.calendar = await api("/calendar/upcoming?days=30");
+  } else if (state.view === "graph") {
+    state.data.projects = await api("/projects");
+    state.data.companies = await api("/companies");
+    const projectId = state.data.graphProjectId || (state.data.projects[0] && state.data.projects[0].id);
+    state.data.graphProjectId = projectId || "";
+    state.data.graph = projectId ? await api(`/graph/projects/${projectId}`) : null;
   }
 }
 
@@ -155,6 +161,7 @@ function renderShell(content) {
           ${navButton("tasks", "Задачи")}
           ${navButton("finance", "Финансы")}
           ${navButton("calendar", "Календарь")}
+          ${navButton("graph", "Граф объекта")}
           ${navButton("knowledge", "База знаний")}
           ${navButton("events", "Журнал")}
         </nav>
@@ -355,7 +362,10 @@ function renderProjects() {
                 <td>${item.name}<div class="muted">${item.address || ""}</div></td>
                 <td>${item.status}</td>
                 <td>${item.contract_value ?? "—"}</td>
-                <td><button class="secondary" data-archive="${item.id}">Архив</button></td>
+                <td>
+                  <button class="secondary" data-graph="${item.id}">Граф</button>
+                  <button class="secondary" data-archive="${item.id}">Архив</button>
+                </td>
               </tr>`
               )
               .join("")}
@@ -380,6 +390,13 @@ function renderProjects() {
       }),
     });
     await safeLoad();
+  });
+  content.querySelectorAll("[data-graph]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.data.graphProjectId = button.dataset.graph;
+      state.view = "graph";
+      await safeLoad();
+    });
   });
   content.querySelectorAll("[data-archive]").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -959,6 +976,121 @@ function renderCalendar() {
   });
 }
 
+function renderGraph() {
+  const projects = state.data.projects || [];
+  const companies = state.data.companies || [];
+  const graph = state.data.graph;
+  const projectOptions = projects
+    .map(
+      (item) =>
+        `<option value="${item.id}" ${item.id === state.data.graphProjectId ? "selected" : ""}>${item.name}</option>`
+    )
+    .join("");
+  const companyOptions = companies.map((item) => `<option value="${item.id}">${item.name}</option>`).join("");
+  const stats = (graph && graph.stats) || {};
+  const content = el(`
+    <div class="grid">
+      <div class="panel">
+        <h2>Объект</h2>
+        <p class="muted">Автосвязи из заказчика, документов, платежей, задач, памяти + ручные рёбра.</p>
+        <form id="graph-select" class="form-grid">
+          <select class="full" name="project_id" required>
+            <option value="">Выберите объект</option>
+            ${projectOptions}
+          </select>
+          <div class="full actions"><button type="submit">Показать граф</button></div>
+        </form>
+        ${
+          graph
+            ? `<p class="muted">Узлов: ${stats.nodes ?? 0} · связей: ${stats.edges ?? 0} · документов: ${stats.documents ?? 0} · платежей: ${stats.payments ?? 0}</p>`
+            : ""
+        }
+        <h2>Ручная связь</h2>
+        <form id="graph-edge-form" class="form-grid">
+          <select class="full" name="company_id" required>
+            <option value="">Связать с компанией</option>
+            ${companyOptions}
+          </select>
+          <select name="relation">
+            <option value="related_to">related_to</option>
+            <option value="mentions">mentions</option>
+            <option value="depends_on">depends_on</option>
+          </select>
+          <input name="label" placeholder="Подпись связи" />
+          <div class="full actions"><button type="submit" ${graph ? "" : "disabled"}>Добавить</button></div>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>Узлы</h2>
+        <table class="table">
+          <thead><tr><th>Тип</th><th>Название</th></tr></thead>
+          <tbody>
+            ${((graph && graph.nodes) || [])
+              .map((node) => `<tr><td>${node.entity_type}</td><td>${node.label}</td></tr>`)
+              .join("") || `<tr><td colspan="2" class="muted">Выберите объект</td></tr>`}
+          </tbody>
+        </table>
+        <h2 style="margin-top:1rem">Связи</h2>
+        <table class="table">
+          <thead><tr><th>От</th><th>Связь</th><th>К</th><th>Источник</th><th></th></tr></thead>
+          <tbody>
+            ${((graph && graph.edges) || [])
+              .map((edge) => {
+                const from = ((graph && graph.nodes) || []).find((n) => n.id === edge.from_id);
+                const to = ((graph && graph.nodes) || []).find((n) => n.id === edge.to_id);
+                return `<tr>
+                  <td>${from ? from.label : edge.from_id}</td>
+                  <td>${edge.label || edge.relation}</td>
+                  <td>${to ? to.label : edge.to_id}</td>
+                  <td>${edge.source}</td>
+                  <td>${
+                    edge.edge_id
+                      ? `<button class="secondary" data-archive-edge="${edge.edge_id}">Архив</button>`
+                      : ""
+                  }</td>
+                </tr>`;
+              })
+              .join("") || `<tr><td colspan="5" class="muted">Нет связей</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `);
+  renderShell(content);
+  document.getElementById("page-title").textContent = "Граф объекта";
+  content.querySelector("#graph-select").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.target);
+    state.data.graphProjectId = String(form.get("project_id") || "");
+    await safeLoad();
+  });
+  content.querySelector("#graph-edge-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!state.data.graphProjectId) return;
+    const form = new FormData(event.target);
+    await api("/graph/edges", {
+      method: "POST",
+      body: JSON.stringify({
+        project_id: state.data.graphProjectId,
+        from_type: "project",
+        from_id: state.data.graphProjectId,
+        to_type: "company",
+        to_id: form.get("company_id"),
+        relation: form.get("relation"),
+        label: form.get("label") || null,
+        source: "manual",
+      }),
+    });
+    await safeLoad();
+  });
+  content.querySelectorAll("[data-archive-edge]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await api(`/graph/edges/${button.dataset.archiveEdge}/archive`, { method: "POST" });
+      await safeLoad();
+    });
+  });
+}
+
 function render() {
   if (!state.token) {
     renderLogin();
@@ -980,6 +1112,7 @@ function render() {
     tasks: renderTasks,
     finance: renderFinance,
     calendar: renderCalendar,
+    graph: renderGraph,
     knowledge: renderKnowledge,
     events: renderEvents,
   };

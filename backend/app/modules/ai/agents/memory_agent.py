@@ -22,8 +22,8 @@ def remember_text(session: Session, text: str, user_id: UUID, project_id: UUID |
     )
 
 
-def recall_text(session: Session, query: str | None = None):
-    return recall(session, query=query)
+def recall_text(session: Session, query: str | None = None, project_id: UUID | None = None):
+    return recall(session, query=query, project_id=project_id)
 
 
 def recall_template_hints(session: Session, slug: str, limit: int = 5) -> list[str]:

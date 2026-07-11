@@ -38,10 +38,11 @@ def create_memory(
 @router.get("", response_model=list[MemoryRead])
 def list_memory(
     q: str | None = None,
+    project_id: UUID | None = None,
     session: Session = Depends(get_session),
     _: User = Depends(get_current_user),
 ) -> list[MemoryFact]:
-    return recall(session, query=q)
+    return recall(session, query=q, project_id=project_id)
 
 
 @router.post("/{fact_id}/archive", response_model=MemoryRead)

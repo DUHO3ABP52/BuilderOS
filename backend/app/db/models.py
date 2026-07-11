@@ -5,6 +5,7 @@ from app.modules.companies.models import Company
 from app.modules.documents.models import Document, DocumentVersion
 from app.modules.events.models import AuditEvent
 from app.modules.finance.models import Payment
+from app.modules.graph.models import GraphEdge
 from app.modules.knowledge.models import KnowledgeItem
 from app.modules.memory.models import MemoryFact
 from app.modules.projects.models import Project
@@ -25,4 +26,5 @@ __all__ = [
     "MemoryFact",
     "Payment",
     "CalendarEvent",
+    "GraphEdge",
 ]

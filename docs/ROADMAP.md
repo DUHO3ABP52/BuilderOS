@@ -45,6 +45,15 @@
 - [x] Сканы не уходят в облако по умолчанию
 - [x] Статус vision в `/ai/llm-status` и UI
 
+## Alpha 0.8 — Knowledge graph объекта
+
+- [x] Автограф связей вокруг Project
+- [x] Ручные рёбра `graph_edges`
+- [x] Graph Agent + intent `project_context`
+- [x] Память с фильтром по `project_id`
+- [x] UI «Граф объекта»
+
 ## Дальше
 
-- корпоративная память и knowledge graph связей объекта.
+- teacher-контур: обезличенный вопрос облаку → локальный PATTERN (см. [LEARNING.md](LEARNING.md));
+- визуализация графа / автоизвлечение связей из документов.

@@ -5,7 +5,15 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.modules.ai.agents import calendar_agent, document_agent, finance_agent, knowledge_agent, memory_agent, task_agent
+from app.modules.ai.agents import (
+    calendar_agent,
+    document_agent,
+    finance_agent,
+    graph_agent,
+    knowledge_agent,
+    memory_agent,
+    task_agent,
+)
 from app.modules.ai import llm_assist
 from app.modules.ai.schemas import AgentName, AssistantAction, AssistantRequest, AssistantResponse, IntentName
 from app.modules.events.models import AuditAction
@@ -20,6 +28,19 @@ def classify_intent(message: str) -> IntentName:
         return IntentName.REMEMBER
     if any(token in text for token in ["что ты помнишь", "вспомни", "память"]):
         return IntentName.RECALL
+    if any(
+        token in text
+        for token in [
+            "граф",
+            "контекст объекта",
+            "что связано с",
+            "связи объекта",
+            "по объекту",
+            "расскажи про объект",
+            "что известно об объекте",
+        ]
+    ):
+        return IntentName.PROJECT_CONTEXT
     if any(token in text for token in ["баланс", "сводка по финанс", "финансов", "сколько получили", "сколько потратили"]):
         return IntentName.FINANCE_SUMMARY
     if any(token in text for token in ["платёж", "платеж", "оплат", "аванс", "счет на", "счёт на"]):
@@ -83,6 +104,7 @@ def handle_assistant(session: Session, user_id: UUID, payload: AssistantRequest)
                 "• задачи («добавь задачу…»)\n"
                 "• платежи («добавь платёж аванс 150000», «баланс»)\n"
                 "• календарь («добавь встречу завтра», «что в календаре»)\n"
+                "• граф объекта («контекст объекта», «что связано с объектом»)\n"
                 "• память («запомни: …»)"
             ),
             intent=intent,
@@ -97,6 +119,8 @@ def handle_assistant(session: Session, user_id: UUID, payload: AssistantRequest)
         return _handle_remember(session, user_id, payload)
     if intent == IntentName.RECALL:
         return _handle_recall(session, payload)
+    if intent == IntentName.PROJECT_CONTEXT:
+        return _handle_project_context(session, payload)
     if intent == IntentName.CREATE_TASK:
         return _handle_create_task(session, user_id, payload)
     if intent == IntentName.LIST_TASKS:
@@ -117,7 +141,7 @@ def handle_assistant(session: Session, user_id: UUID, payload: AssistantRequest)
         reply=hint
         or (
             "Не уверен, что сделать. Попробуйте: «сделай договор», «найди ГОСТ», "
-            "«добавь платёж…», «добавь встречу завтра» или «помощь»."
+            "«контекст объекта», «добавь платёж…» или «помощь»."
         ),
         intent=IntentName.UNKNOWN,
         agent=AgentName.COORDINATOR,
@@ -318,7 +342,11 @@ def _handle_remember(session: Session, user_id: UUID, payload: AssistantRequest)
 
 def _handle_recall(session: Session, payload: AssistantRequest) -> AssistantResponse:
     query = _extract_after(payload.message, ["вспомни", "что ты помнишь", "память"])
-    facts = memory_agent.recall_text(session, query if query and query != payload.message else None)
+    facts = memory_agent.recall_text(
+        session,
+        query if query and query != payload.message else None,
+        project_id=payload.project_id,
+    )
     if not facts:
         return AssistantResponse(
             reply="Пока ничего не помню. Скажите «запомни: …», и я сохраню факт.",
@@ -332,6 +360,19 @@ def _handle_recall(session: Session, payload: AssistantRequest) -> AssistantResp
         intent=IntentName.RECALL,
         agent=AgentName.MEMORY,
         data={"items": [{"id": str(fact.id), "key": fact.key, "content": fact.content} for fact in facts[:10]]},
+    )
+
+
+def _handle_project_context(session: Session, payload: AssistantRequest) -> AssistantResponse:
+    reply, data = graph_agent.project_context(session, payload.project_id, payload.message)
+    status = "ok" if data else "needs_data"
+    return AssistantResponse(
+        reply=reply,
+        intent=IntentName.PROJECT_CONTEXT,
+        agent=AgentName.GRAPH,
+        status=status,
+        missing_fields=[] if data else ["project_id"],
+        data=data,
     )
 
 

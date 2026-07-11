@@ -14,8 +14,15 @@ def remember(session: Session, payload: MemoryCreate, user_id: UUID) -> MemoryFa
     return fact
 
 
-def recall(session: Session, query: str | None = None, limit: int = 20) -> list[MemoryFact]:
+def recall(
+    session: Session,
+    query: str | None = None,
+    limit: int = 20,
+    project_id: UUID | None = None,
+) -> list[MemoryFact]:
     statement = select(MemoryFact).where(MemoryFact.is_archived.is_(False))
+    if project_id is not None:
+        statement = statement.where(MemoryFact.project_id == project_id)
     if query:
         pattern = f"%{query}%"
         statement = statement.where(
