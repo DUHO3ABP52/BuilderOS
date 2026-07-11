@@ -21,7 +21,11 @@ def _node_key(entity_type: str, entity_id: UUID | str) -> str:
 
 
 def create_edge(session: Session, payload: GraphEdgeCreate, user_id: UUID) -> GraphEdge:
-    data = payload.model_dump(mode="json")
+    data = payload.model_dump()
+    for key in ("from_type", "to_type", "relation"):
+        value = data.get(key)
+        if hasattr(value, "value"):
+            data[key] = value.value
     edge = GraphEdge(**data, created_by_id=user_id)
     session.add(edge)
     session.flush()
