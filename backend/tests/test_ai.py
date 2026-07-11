@@ -85,3 +85,5 @@ def test_llm_status_when_disabled(client: TestClient, auth_headers: dict[str, st
     assert body["model_ready"] is False
     assert "warmup" in body
     assert "endpoints" in body
+    assert "vision" in body
+    assert body["vision"]["enabled"] is False

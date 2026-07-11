@@ -41,6 +41,15 @@ class Settings(BaseSettings):
     # Фрагменты базы знаний уходят в облако только при явном разрешении
     llm_cloud_for_knowledge: bool = False
 
+    # Vision OCR (локальная multimodal-модель в Ollama)
+    llm_vision_enabled: bool = True
+    llm_vision_model: str = "llava:7b"
+    llm_vision_timeout_seconds: float = 120.0
+    llm_vision_max_tokens: int = 4096
+    llm_vision_min_chars: int = 40  # если Tesseract короче — пробуем vision
+    llm_cloud_for_vision: bool = False  # сканы договоров в облако не отправляем
+    llm_vision_auto_pull: bool = True
+
     # RAG / Qdrant
     rag_enabled: bool = True
     rag_collection: str = "builderos_knowledge"

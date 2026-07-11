@@ -81,6 +81,23 @@ LLM_FALLBACK_BASE_URL=http://host.docker.internal:20128
 |---|---|
 | Разбор намерения («что хочет пользователь») | допустимо в hybrid |
 | Ответ по фрагментам ГОСТ/СП из вашей базы | **нет** по умолчанию (`LLM_CLOUD_FOR_KNOWLEDGE=false`) |
+| OCR сканов договоров (vision) | **нет** по умолчанию (`LLM_CLOUD_FOR_VISION=false`) |
+
+## Vision OCR
+
+Для сложных фото/сканов: Tesseract → при слабом результате vision-модель Ollama.
+
+```env
+LLM_VISION_ENABLED=true
+LLM_VISION_MODEL=llava:7b
+# альтернатива для кириллицы: qwen2.5vl:7b
+LLM_CLOUD_FOR_VISION=false
+```
+
+`ollama-init` при `LLM_VISION_ENABLED=true` сам делает `ollama pull` vision-модели.
+Статус: `GET /api/v1/ai/llm-status` → поле `vision`.
+
+Подробнее: [SAMPLES.md](SAMPLES.md).
 
 ## GPU (NVIDIA)
 

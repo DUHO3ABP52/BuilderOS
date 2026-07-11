@@ -70,6 +70,36 @@ def fallback_endpoint() -> LLMEndpoint | None:
     return None
 
 
+def vision_endpoint() -> LLMEndpoint:
+    """Локальная vision-модель на том же OpenAI-compatible endpoint (обычно Ollama)."""
+    base = _normalize_base(settings.llm_base_url)
+    kind = "ollama" if ":11434" in base else "openai"
+    return LLMEndpoint(
+        name="vision",
+        base_url=base,
+        model=settings.llm_vision_model,
+        api_key=settings.llm_api_key or None,
+        kind=kind,
+    )
+
+
+def vision_endpoints(*, allow_cloud: bool = False) -> list[LLMEndpoint]:
+    endpoints = [vision_endpoint()]
+    if allow_cloud and settings.llm_cloud_for_vision:
+        fb = fallback_endpoint()
+        if fb:
+            endpoints.append(
+                LLMEndpoint(
+                    name=f"{fb.name}-vision",
+                    base_url=fb.base_url,
+                    model=settings.llm_vision_model or fb.model,
+                    api_key=fb.api_key,
+                    kind=fb.kind,
+                )
+            )
+    return endpoints
+
+
 def active_endpoints(*, allow_cloud: bool = True) -> list[LLMEndpoint]:
     provider = (settings.llm_provider or "ollama").strip().lower()
     primary = primary_endpoint()
@@ -232,6 +262,46 @@ def chat(
     raise LLMError("Не удалось обратиться к LLM: " + "; ".join(errors))
 
 
+def chat_vision(
+    messages: list[dict[str, Any]],
+    *,
+    temperature: float = 0.0,
+    max_tokens: int | None = None,
+    allow_cloud: bool = False,
+) -> str:
+    """Multimodal chat (OCR/vision). По умолчанию только локальная модель."""
+    if not settings.llm_vision_enabled:
+        raise LLMError("Vision OCR отключён")
+    if not llm_is_configured():
+        raise LLMError("LLM отключена в настройках")
+
+    payload_base: dict[str, Any] = {
+        "temperature": temperature,
+        "max_tokens": settings.llm_vision_max_tokens if max_tokens is None else max_tokens,
+        "stream": False,
+    }
+    timeout = settings.llm_vision_timeout_seconds
+    errors: list[str] = []
+    for endpoint in vision_endpoints(allow_cloud=allow_cloud):
+        if settings.llm_vision_auto_pull and (endpoint.kind == "ollama" or ":11434" in endpoint.base_url):
+            ensure_ollama_model(endpoint)
+        payload = {**payload_base, "model": endpoint.model, "messages": messages}
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                response = client.post(_chat_url(endpoint), json=payload, headers=_headers(endpoint))
+                response.raise_for_status()
+                data = response.json()
+            content = data["choices"][0]["message"]["content"]
+            if not isinstance(content, str) or not content.strip():
+                raise LLMError("Пустой ответ vision-LLM")
+            return content.strip()
+        except Exception as exc:
+            logger.warning("Vision LLM %s failed: %s", endpoint.name, exc)
+            errors.append(f"{endpoint.name}: {exc}")
+
+    raise LLMError("Не удалось обратиться к vision-LLM: " + "; ".join(errors))
+
+
 def warm_state() -> dict[str, Any]:
     return dict(_warm_state)
 
@@ -318,6 +388,20 @@ def status_payload() -> dict[str, Any]:
                 "models": list_models(ep) if st == "ok" else [],
             }
         )
+    vision = None
+    if settings.llm_vision_enabled:
+        vep = vision_endpoint()
+        vst = check_endpoint(vep)
+        vision = {
+            "enabled": True,
+            "model": vep.model,
+            "base_url": vep.base_url,
+            "status": vst,
+            "model_ready": model_is_ready(vep) if vst == "ok" else False,
+            "cloud_allowed": settings.llm_cloud_for_vision,
+        }
+    else:
+        vision = {"enabled": False, "model": settings.llm_vision_model, "status": "disabled"}
     return {
         "enabled": settings.llm_enabled,
         "provider": settings.llm_provider,
@@ -328,4 +412,5 @@ def status_payload() -> dict[str, Any]:
         "warmup": warm_state(),
         "endpoints": endpoints,
         "models": endpoints[0]["models"] if endpoints else [],
+        "vision": vision,
     }

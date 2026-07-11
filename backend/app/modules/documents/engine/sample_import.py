@@ -9,6 +9,7 @@ from pathlib import Path
 from app.modules.documents.engine.builder_document import BuilderDocument, VariableDefinition
 from app.modules.documents.engine.parser import parse_docx
 from app.modules.documents.engine.text_parser import detect_doc_type, parse_plain_text, templatize_document
+from app.services.vision_ocr import extract_text_smart, render_pdf_pages
 
 logger = logging.getLogger(__name__)
 
@@ -58,32 +59,31 @@ def extract_text_from_pdf(data: bytes) -> tuple[str, list[str]]:
         if text.strip():
             pages.append(text)
     joined = "\n".join(pages).strip()
+    if joined:
+        return joined, warnings
+
+    warnings.append("PDF без текстового слоя — OCR страниц (Tesseract / vision).")
+    try:
+        images = render_pdf_pages(data, max_pages=5)
+    except Exception as exc:
+        logger.info("PDF rasterize failed: %s", exc)
+        warnings.append("Не удалось растрировать PDF. Загрузите фото страниц.")
+        return "", warnings
+
+    ocr_parts: list[str] = []
+    for index, image_bytes in enumerate(images, start=1):
+        page_text, page_warnings = extract_text_smart(image_bytes)
+        warnings.extend([f"стр.{index}: {item}" for item in page_warnings])
+        if page_text.strip():
+            ocr_parts.append(page_text.strip())
+    joined = "\n\n".join(ocr_parts).strip()
     if not joined:
-        warnings.append("PDF не содержит текстового слоя. Если это скан — загрузите фото страниц или PDF с OCR.")
+        warnings.append("OCR не извлёк текст из скан-PDF.")
     return joined, warnings
 
 
 def extract_text_from_image(data: bytes) -> tuple[str, list[str]]:
-    warnings: list[str] = []
-    try:
-        from PIL import Image
-        import pytesseract
-    except Exception as exc:  # pragma: no cover
-        raise RuntimeError("Для OCR нужны Pillow и pytesseract") from exc
-
-    image = Image.open(BytesIO(data))
-    if image.mode not in {"RGB", "L"}:
-        image = image.convert("RGB")
-    try:
-        text = pytesseract.image_to_string(image, lang="rus+eng")
-    except Exception:
-        # fallback without russian traineddata
-        warnings.append("Русский OCR pack недоступен, использован eng.")
-        text = pytesseract.image_to_string(image, lang="eng")
-    cleaned = (text or "").strip()
-    if not cleaned:
-        warnings.append("OCR не распознал текст на изображении.")
-    return cleaned, warnings
+    return extract_text_smart(data)
 
 
 def extract_text_from_bytes(

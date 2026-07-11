@@ -17,6 +17,11 @@ services:
       LLM_FALLBACK_BASE_URL: ${LLM_FALLBACK_BASE_URL:-http://omniroute:20128}
       LLM_FALLBACK_MODEL: ${LLM_FALLBACK_MODEL:-auto/cheap}
       LLM_CLOUD_FOR_KNOWLEDGE: ${LLM_CLOUD_FOR_KNOWLEDGE:-false}
+      LLM_VISION_ENABLED: ${LLM_VISION_ENABLED:-true}
+      LLM_VISION_MODEL: ${LLM_VISION_MODEL:-llava:7b}
+      LLM_VISION_TIMEOUT_SECONDS: ${LLM_VISION_TIMEOUT_SECONDS:-120}
+      LLM_CLOUD_FOR_VISION: ${LLM_CLOUD_FOR_VISION:-false}
+      LLM_VISION_AUTO_PULL: ${LLM_VISION_AUTO_PULL:-true}
       RAG_ENABLED: ${RAG_ENABLED:-true}
       RAG_COLLECTION: ${RAG_COLLECTION:-builderos_knowledge}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
@@ -107,6 +112,8 @@ services:
       OLLAMA_HOST: http://ollama:11434
       LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      LLM_VISION_ENABLED: ${LLM_VISION_ENABLED:-true}
+      LLM_VISION_MODEL: ${LLM_VISION_MODEL:-llava:7b}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -115,6 +122,10 @@ services:
         ollama pull "$$LLM_MODEL"
         echo "BuilderOS: ensuring embedding model $$EMBEDDING_MODEL ..."
         ollama pull "$$EMBEDDING_MODEL"
+        if [ "$$LLM_VISION_ENABLED" = "true" ] || [ "$$LLM_VISION_ENABLED" = "1" ]; then
+          echo "BuilderOS: ensuring vision model $$LLM_VISION_MODEL ..."
+          ollama pull "$$LLM_VISION_MODEL"
+        fi
         echo "BuilderOS: models ready"
     restart: "no"
 

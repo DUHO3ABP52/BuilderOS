@@ -679,6 +679,11 @@ function renderAssistant() {
       const warm = (llm.warmup && llm.warmup.detail) || llm.provider_status;
       llmLine = `LLM: загружается… (${warm})`;
     }
+    if (llm.vision) {
+      if (!llm.vision.enabled) llmLine += " · Vision OCR: выкл";
+      else if (llm.vision.model_ready) llmLine += ` · Vision OCR: ${llm.vision.model}`;
+      else llmLine += ` · Vision OCR: ${llm.vision.status || "ожидание"} (${llm.vision.model})`;
+    }
   }
   const content = el(`
     <div class="grid">

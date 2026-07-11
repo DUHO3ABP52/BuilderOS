@@ -38,7 +38,13 @@
 - [x] Finance / Calendar agents + intents в координаторе
 - [x] UI разделы и виджеты на dashboard
 
+## Alpha 0.7 — Vision OCR
+
+- [x] Умный OCR: Tesseract + vision-LLM (Ollama)
+- [x] OCR скан-PDF (растр страниц)
+- [x] Сканы не уходят в облако по умолчанию
+- [x] Статус vision в `/ai/llm-status` и UI
+
 ## Дальше
 
-- более точный OCR/vision LLM для сложных сканов;
 - корпоративная память и knowledge graph связей объекта.

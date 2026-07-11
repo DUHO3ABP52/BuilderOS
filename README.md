@@ -18,13 +18,14 @@
 - email: `admin@example.com`
 - password: `change-me`
 
-## Что уже есть (0.6.0-alpha)
+## Что уже есть (0.7.0-alpha)
 
 - Docker: API, PostgreSQL, Redis, MinIO, Qdrant, Ollama, Frontend
 - JWT-авторизация и первый пользователь
 - Компании и строительные объекты с архивированием
 - Document Engine: `BuilderDocument`, секции, переменные, DOCX/PDF/HTML
-- **Импорт образцов**: DOCX / PDF / TXT / фото → шаблон (OCR)
+- **Импорт образцов**: DOCX / PDF / TXT / фото → шаблон
+- **Vision OCR**: Tesseract + локальная vision-LLM для сложных сканов и скан-PDF
 - Реестр шаблонов, версии, обучение на правках
 - Библиотека блоков договора
 - База знаний + RAG-поиск (Qdrant + embeddings)
