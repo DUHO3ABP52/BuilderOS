@@ -74,7 +74,7 @@ async function loadView() {
     state.data.chat = state.data.chat || [
       {
         role: "assistant",
-        text: "Я координатор BuilderOS. Напишите «сделай договор», «найди ГОСТ», «добавь платёж…», «добавь встречу завтра» или «помощь».",
+        text: "Я координатор BuilderOS. Напишите «сделай договор», «найди ГОСТ», «спроси учителя: …», «контекст объекта» или «помощь».",
       },
     ];
     try {
@@ -701,6 +701,10 @@ function renderAssistant() {
       else if (llm.vision.model_ready) llmLine += ` · Vision OCR: ${llm.vision.model}`;
       else llmLine += ` · Vision OCR: ${llm.vision.status || "ожидание"} (${llm.vision.model})`;
     }
+    if (llm.teacher) {
+      if (!llm.teacher.enabled) llmLine += " · Teacher: выкл";
+      else llmLine += ` · Teacher: ${llm.teacher.status}${llm.teacher.model ? ` (${llm.teacher.model})` : ""}`;
+    }
   }
   const content = el(`
     <div class="grid">
@@ -720,9 +724,9 @@ function renderAssistant() {
             .join("")}
         </div>
         <form id="chat-form" class="form-grid" style="margin-top:1rem">
-          <textarea class="full" name="message" rows="3" placeholder="Например: сделай договор" required></textarea>
+          <textarea class="full" name="message" rows="3" placeholder="Например: спроси учителя: как обычно формулируют гарантию" required></textarea>
           <textarea class="full" name="variables" rows="5" placeholder='Переменные JSON (для договора)'></textarea>
-          <label class="full muted"><input type="checkbox" name="confirm" /> Создать черновик даже без всех полей</label>
+          <label class="full muted"><input type="checkbox" name="confirm" /> Подтвердить действие (черновик документа / сохранить паттерн учителя)</label>
           <div class="full actions"><button type="submit">Отправить</button></div>
         </form>
       </div>

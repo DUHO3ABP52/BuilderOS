@@ -100,6 +100,26 @@ def vision_endpoints(*, allow_cloud: bool = False) -> list[LLMEndpoint]:
     return endpoints
 
 
+def teacher_endpoints() -> list[LLMEndpoint]:
+    """Учитель: только облачный/fallback endpoint (не локальная Ollama)."""
+    provider = (settings.llm_provider or "ollama").strip().lower()
+    if provider == "omniroute":
+        return [
+            LLMEndpoint(
+                name="omniroute",
+                base_url=_normalize_base(settings.llm_base_url),
+                model=settings.llm_model or "auto/cheap",
+                api_key=settings.llm_api_key or None,
+                kind="openai",
+            )
+        ]
+    fb = fallback_endpoint()
+    if fb:
+        return [fb]
+    # нет OmniRoute — не шлём сырой запрос в локальную chat-модель как «учителя»
+    return []
+
+
 def active_endpoints(*, allow_cloud: bool = True) -> list[LLMEndpoint]:
     provider = (settings.llm_provider or "ollama").strip().lower()
     primary = primary_endpoint()
@@ -302,6 +322,48 @@ def chat_vision(
     raise LLMError("Не удалось обратиться к vision-LLM: " + "; ".join(errors))
 
 
+def chat_teacher(
+    messages: list[dict[str, Any]],
+    *,
+    temperature: float = 0.2,
+    max_tokens: int = 900,
+) -> str:
+    """Облачный учитель (OmniRoute). Не использует локальную Ollama."""
+    if not settings.llm_teacher_enabled:
+        raise LLMError("Teacher-контур отключён")
+    if not settings.llm_cloud_for_teacher:
+        raise LLMError("Облачный учитель запрещён настройками")
+    if not llm_is_configured():
+        raise LLMError("LLM отключена в настройках")
+
+    endpoints = teacher_endpoints()
+    if not endpoints:
+        raise LLMError("Учитель недоступен: не настроен LLM_FALLBACK_BASE_URL / OmniRoute")
+
+    payload_base: dict[str, Any] = {
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": False,
+    }
+    errors: list[str] = []
+    for endpoint in endpoints:
+        payload = {**payload_base, "model": endpoint.model, "messages": messages}
+        try:
+            with httpx.Client(timeout=settings.llm_teacher_timeout_seconds) as client:
+                response = client.post(_chat_url(endpoint), json=payload, headers=_headers(endpoint))
+                response.raise_for_status()
+                data = response.json()
+            content = data["choices"][0]["message"]["content"]
+            if not isinstance(content, str) or not content.strip():
+                raise LLMError("Пустой ответ учителя")
+            return content.strip()
+        except Exception as exc:
+            logger.warning("Teacher LLM %s failed: %s", endpoint.name, exc)
+            errors.append(f"{endpoint.name}: {exc}")
+
+    raise LLMError("Не удалось обратиться к учителю: " + "; ".join(errors))
+
+
 def warm_state() -> dict[str, Any]:
     return dict(_warm_state)
 
@@ -402,6 +464,19 @@ def status_payload() -> dict[str, Any]:
         }
     else:
         vision = {"enabled": False, "model": settings.llm_vision_model, "status": "disabled"}
+
+    teacher_eps = teacher_endpoints() if settings.llm_teacher_enabled and settings.llm_cloud_for_teacher else []
+    teacher = {
+        "enabled": settings.llm_teacher_enabled,
+        "cloud_allowed": settings.llm_cloud_for_teacher,
+        "auto_save": settings.llm_teacher_auto_save,
+        "confidence": settings.llm_teacher_confidence,
+        "status": "disabled"
+        if not settings.llm_teacher_enabled
+        else ("forbidden" if not settings.llm_cloud_for_teacher else ("ok" if teacher_eps and check_endpoint(teacher_eps[0]) == "ok" else "unavailable")),
+        "endpoint": teacher_eps[0].name if teacher_eps else None,
+        "model": teacher_eps[0].model if teacher_eps else None,
+    }
     return {
         "enabled": settings.llm_enabled,
         "provider": settings.llm_provider,
@@ -413,4 +488,5 @@ def status_payload() -> dict[str, Any]:
         "endpoints": endpoints,
         "models": endpoints[0]["models"] if endpoints else [],
         "vision": vision,
+        "teacher": teacher,
     }

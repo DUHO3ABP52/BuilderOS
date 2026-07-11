@@ -13,17 +13,33 @@ from app.modules.ai.agents import (
     knowledge_agent,
     memory_agent,
     task_agent,
+    teacher_agent,
 )
 from app.modules.ai import llm_assist
 from app.modules.ai.schemas import AgentName, AssistantAction, AssistantRequest, AssistantResponse, IntentName
 from app.modules.events.models import AuditAction
 from app.modules.events.service import log_event
+from app.services.llm import LLMError
 
 
 def classify_intent(message: str) -> IntentName:
     text = message.lower().strip()
     if any(token in text for token in ["помощь", "что умеешь", "help", "команды"]):
         return IntentName.HELP
+    if any(
+        token in text
+        for token in [
+            "спроси учителя",
+            "спроси облако",
+            "спроси у учителя",
+            "научись",
+            "как принято",
+            "как обычно формулир",
+            "что обычно пишут",
+            "teacher",
+        ]
+    ):
+        return IntentName.ASK_TEACHER
     if any(token in text for token in ["запомни", "запомнить", "учти что"]):
         return IntentName.REMEMBER
     if any(token in text for token in ["что ты помнишь", "вспомни", "память"]):
@@ -105,6 +121,7 @@ def handle_assistant(session: Session, user_id: UUID, payload: AssistantRequest)
                 "• платежи («добавь платёж аванс 150000», «баланс»)\n"
                 "• календарь («добавь встречу завтра», «что в календаре»)\n"
                 "• граф объекта («контекст объекта», «что связано с объектом»)\n"
+                "• учитель («спроси учителя: как обычно формулируют гарантию»)\n"
                 "• память («запомни: …»)"
             ),
             intent=intent,
@@ -121,6 +138,8 @@ def handle_assistant(session: Session, user_id: UUID, payload: AssistantRequest)
         return _handle_recall(session, payload)
     if intent == IntentName.PROJECT_CONTEXT:
         return _handle_project_context(session, payload)
+    if intent == IntentName.ASK_TEACHER:
+        return _handle_ask_teacher(session, user_id, payload)
     if intent == IntentName.CREATE_TASK:
         return _handle_create_task(session, user_id, payload)
     if intent == IntentName.LIST_TASKS:
@@ -141,11 +160,18 @@ def handle_assistant(session: Session, user_id: UUID, payload: AssistantRequest)
         reply=hint
         or (
             "Не уверен, что сделать. Попробуйте: «сделай договор», «найди ГОСТ», "
-            "«контекст объекта», «добавь платёж…» или «помощь»."
+            "«спроси учителя: …», «контекст объекта» или «помощь»."
         ),
         intent=IntentName.UNKNOWN,
         agent=AgentName.COORDINATOR,
         status="needs_clarification",
+        actions=[
+            AssistantAction(
+                type="ask_teacher",
+                label="Спросить учителя (облако, обезличенно)",
+                payload={"message": payload.message},
+            )
+        ],
     )
 
 
@@ -373,6 +399,101 @@ def _handle_project_context(session: Session, payload: AssistantRequest) -> Assi
         status=status,
         missing_fields=[] if data else ["project_id"],
         data=data,
+    )
+
+
+def _handle_ask_teacher(session: Session, user_id: UUID, payload: AssistantRequest) -> AssistantResponse:
+    question = _extract_after(
+        payload.message,
+        [
+            "спроси учителя",
+            "спроси у учителя",
+            "спроси облако",
+            "научись",
+            "как принято",
+            "как обычно формулируют",
+            "что обычно пишут",
+            "teacher",
+        ],
+    )
+    question = question or payload.message
+    try:
+        result = teacher_agent.ask(
+            session,
+            question,
+            user_id,
+            project_id=payload.project_id,
+            save=payload.confirm,
+        )
+    except ValueError as error:
+        return AssistantResponse(
+            reply=str(error),
+            intent=IntentName.ASK_TEACHER,
+            agent=AgentName.TEACHER,
+            status="needs_data",
+        )
+    except LLMError as error:
+        return AssistantResponse(
+            reply=(
+                f"Учитель недоступен: {error}. "
+                "Нужны OmniRoute (`docker compose --profile omniroute up`) и "
+                "LLM_CLOUD_FOR_TEACHER=true."
+            ),
+            intent=IntentName.ASK_TEACHER,
+            agent=AgentName.TEACHER,
+            status="error",
+        )
+
+    if result.saved:
+        log_event(
+            session,
+            actor_id=user_id,
+            entity_type="memory",
+            entity_id=result.memory_id,
+            action=AuditAction.CREATE,
+            summary="Сохранён PATTERN от учителя",
+        )
+        session.commit()
+        reply = (
+            "Обезличенный вопрос учителю:\n"
+            f"«{result.sanitized_question}»\n\n"
+            f"{result.answer}\n\n"
+            "Сохранил как локальный PATTERN (source=teacher). "
+            "Это справочный паттерн, не готовый документ."
+        )
+        status = "ok"
+        actions: list[AssistantAction] = []
+    else:
+        session.rollback()
+        reply = (
+            "Обезличенный вопрос учителю:\n"
+            f"«{result.sanitized_question}»\n\n"
+            f"{result.answer}\n\n"
+            "Ответ ещё не сохранён. Повторите запрос с confirm=true, "
+            "чтобы записать PATTERN в локальную память."
+        )
+        status = "needs_confirmation"
+        actions = [
+            AssistantAction(
+                type="save_teacher_pattern",
+                label="Сохранить паттерн локально",
+                payload={"message": payload.message, "confirm": True, "project_id": str(payload.project_id) if payload.project_id else None},
+            )
+        ]
+
+    return AssistantResponse(
+        reply=reply,
+        intent=IntentName.ASK_TEACHER,
+        agent=AgentName.TEACHER,
+        status=status,
+        actions=actions,
+        data={
+            "sanitized_question": result.sanitized_question,
+            "redactions": result.redactions,
+            "saved": result.saved,
+            "memory_id": str(result.memory_id) if result.memory_id else None,
+            "answer": result.answer,
+        },
     )
 
 

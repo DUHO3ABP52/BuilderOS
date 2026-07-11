@@ -14,6 +14,7 @@ class AgentName(StrEnum):
     FINANCE = "finance"
     CALENDAR = "calendar"
     GRAPH = "graph"
+    TEACHER = "teacher"
 
 
 class IntentName(StrEnum):
@@ -29,6 +30,7 @@ class IntentName(StrEnum):
     CREATE_EVENT = "create_event"
     LIST_EVENTS = "list_events"
     PROJECT_CONTEXT = "project_context"
+    ASK_TEACHER = "ask_teacher"
     HELP = "help"
     UNKNOWN = "unknown"
 

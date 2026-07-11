@@ -15,6 +15,8 @@ os.environ["QDRANT_HOST"] = "localhost"
 os.environ["MINIO_ENDPOINT"] = "localhost:9000"
 os.environ["LLM_ENABLED"] = "false"
 os.environ["LLM_VISION_ENABLED"] = "false"
+os.environ["LLM_TEACHER_ENABLED"] = "true"
+os.environ["LLM_CLOUD_FOR_TEACHER"] = "true"
 os.environ["RAG_ENABLED"] = "true"
 os.environ["EMBEDDING_BASE_URL"] = "http://127.0.0.1:9"
 

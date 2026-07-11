@@ -18,34 +18,28 @@
 - email: `admin@example.com`
 - password: `change-me`
 
-## Что уже есть (0.8.0-alpha)
+## Что уже есть (0.9.0-alpha)
 
 - Docker: API, PostgreSQL, Redis, MinIO, Qdrant, Ollama, Frontend
 - JWT-авторизация и первый пользователь
 - Компании и строительные объекты с архивированием
 - Document Engine: `BuilderDocument`, секции, переменные, DOCX/PDF/HTML
 - **Импорт образцов**: DOCX / PDF / TXT / фото → шаблон
-- **Vision OCR**: Tesseract + локальная vision-LLM для сложных сканов и скан-PDF
-- **Knowledge graph** объекта: автосвязи + ручные рёбра
+- **Vision OCR**: Tesseract + локальная vision-LLM
+- **Knowledge graph** объекта
+- **Teacher-контур**: обезличенный вопрос → OmniRoute → локальный PATTERN
 - Реестр шаблонов, версии, обучение на правках
-- Библиотека блоков договора
-- База знаний + RAG-поиск (Qdrant + embeddings)
-- AI Core: Coordinator + агенты (включая Graph)
-- Локальная LLM (Ollama) + опциональный OmniRoute (hybrid)
-- **Финансы**: платежи, статусы, сводка приход/расход
-- **Календарь**: встречи, выезды, сроки
-- Задачи и корпоративная память
-- Журнал событий
-- Чат помощника в UI
+- База знаний + RAG
+- AI Core: Coordinator + агенты (включая Graph / Teacher)
+- Финансы и календарь
+- Задачи, память, журнал, UI-чат
 
-Примеры запросов к помощнику:
+Примеры:
 
+- `спроси учителя: как обычно формулируют гарантию`
+- `контекст объекта`
 - `сделай договор`
 - `найди ГОСТ`
-- `контекст объекта`
 - `добавь платёж аванс 150000`
-- `баланс`
-- `добавь встречу завтра с заказчиком`
-- `запомни: гарантия всегда 24 месяца`
 
-Подробности: [docs/ROADMAP.md](docs/ROADMAP.md), [docs/GRAPH.md](docs/GRAPH.md), [docs/LEARNING.md](docs/LEARNING.md), [docs/PROJECT.md](docs/PROJECT.md), [docs/LLM.md](docs/LLM.md), [docs/RAG.md](docs/RAG.md), [docs/SAMPLES.md](docs/SAMPLES.md).
+Подробности: [docs/LEARNING.md](docs/LEARNING.md), [docs/GRAPH.md](docs/GRAPH.md), [docs/ROADMAP.md](docs/ROADMAP.md), [docs/LLM.md](docs/LLM.md).

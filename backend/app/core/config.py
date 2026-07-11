@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     # Фрагменты базы знаний уходят в облако только при явном разрешении
     llm_cloud_for_knowledge: bool = False
 
+    # Teacher: обезличенный вопрос → облако → локальный PATTERN
+    llm_teacher_enabled: bool = True
+    llm_cloud_for_teacher: bool = True  # учитель по задумке в облаке (OmniRoute)
+    llm_teacher_auto_save: bool = False  # сохранять PATTERN только с confirm
+    llm_teacher_confidence: float = 0.55
+    llm_teacher_timeout_seconds: float = 90.0
+
     # Vision OCR (локальная multimodal-модель в Ollama)
     llm_vision_enabled: bool = True
     llm_vision_model: str = "llava:7b"

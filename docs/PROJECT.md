@@ -10,7 +10,7 @@
 4. Каждое изменение документа версионируется и объясняется.
 5. Документы собираются из блоков и шаблонов, а не генерируются «с нуля».
 
-## Текущий контур (0.8.0-alpha)
+## Текущий контур (0.9.0-alpha)
 
 - Auth, Companies, Projects, Documents, Templates, Blocks
 - Knowledge + RAG (Qdrant)
@@ -18,9 +18,8 @@
 - Импорт образцов (DOCX/PDF/фото) → шаблон
 - OCR: Tesseract + vision-LLM для сложных сканов
 - Обучение Memory на правках шаблонов
-- **Knowledge graph** связей объекта
-- Финансы: платежи, сводка, Finance Agent
-- Календарь: события, ближайшие даты, Calendar Agent
-- Tasks, Audit, Dashboard
+- Knowledge graph связей объекта
+- **Teacher**: обезличенный вопрос → облако → локальный PATTERN
+- Финансы / календарь / задачи / audit / dashboard
 
-Документация: [ROADMAP.md](ROADMAP.md), [GRAPH.md](GRAPH.md), [LEARNING.md](LEARNING.md), [RAG.md](RAG.md), [SAMPLES.md](SAMPLES.md), [LLM.md](LLM.md).
+Документация: [ROADMAP.md](ROADMAP.md), [LEARNING.md](LEARNING.md), [GRAPH.md](GRAPH.md), [RAG.md](RAG.md), [SAMPLES.md](SAMPLES.md), [LLM.md](LLM.md).

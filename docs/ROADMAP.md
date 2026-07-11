@@ -53,7 +53,15 @@
 - [x] Память с фильтром по `project_id`
 - [x] UI «Граф объекта»
 
+## Alpha 0.9 — Teacher-контур
+
+- [x] Обезличивание ПДн/реквизитов перед облаком
+- [x] Вопрос учителю через OmniRoute (`chat_teacher`)
+- [x] Сохранение PATTERN (`source=teacher`) по confirm
+- [x] API preview/ask + статус в `/ai/llm-status`
+- [x] Документация [LEARNING.md](LEARNING.md)
+
 ## Дальше
 
-- teacher-контур: обезличенный вопрос облаку → локальный PATTERN (см. [LEARNING.md](LEARNING.md));
-- визуализация графа / автоизвлечение связей из документов.
+- визуализация графа / автоизвлечение связей из документов;
+- подсказки Document Agent из teacher-паттернов.

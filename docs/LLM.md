@@ -99,6 +99,18 @@ LLM_CLOUD_FOR_VISION=false
 
 Подробнее: [SAMPLES.md](SAMPLES.md).
 
+## Teacher (самообучение через облако)
+
+Обезличенный вопрос → OmniRoute → локальный PATTERN. См. [LEARNING.md](LEARNING.md).
+
+```env
+LLM_TEACHER_ENABLED=true
+LLM_CLOUD_FOR_TEACHER=true
+LLM_TEACHER_AUTO_SAVE=false
+```
+
+Нужен профиль OmniRoute. Сохранение паттерна — только с `confirm=true` в чате.
+
 ## GPU (NVIDIA)
 
 ```yaml
