@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# Environment and runtime data
+.env
+*.db
+data/
+backend/tests/_runtime_test.db
+
+
+# IDE
+.idea/
+.vscode/
