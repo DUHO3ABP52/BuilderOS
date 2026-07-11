@@ -74,7 +74,7 @@ async function loadView() {
     state.data.chat = state.data.chat || [
       {
         role: "assistant",
-        text: "Я координатор BuilderOS. Напишите «сделай договор», «найди ГОСТ», «добавь задачу…» или «помощь».",
+        text: "Я координатор BuilderOS. Напишите «сделай договор», «найди ГОСТ», «добавь платёж…», «добавь встречу завтра» или «помощь».",
       },
     ];
     try {
@@ -84,6 +84,11 @@ async function loadView() {
     }
   } else if (state.view === "tasks") {
     state.data.tasks = await api("/tasks");
+  } else if (state.view === "finance") {
+    state.data.payments = await api("/finance/payments");
+    state.data.financeSummary = await api("/finance/summary");
+  } else if (state.view === "calendar") {
+    state.data.calendar = await api("/calendar/upcoming?days=30");
   }
 }
 
@@ -148,6 +153,8 @@ function renderShell(content) {
           ${navButton("documents", "Документы")}
           ${navButton("templates", "Шаблоны")}
           ${navButton("tasks", "Задачи")}
+          ${navButton("finance", "Финансы")}
+          ${navButton("calendar", "Календарь")}
           ${navButton("knowledge", "База знаний")}
           ${navButton("events", "Журнал")}
         </nav>
@@ -186,7 +193,8 @@ async function safeLoad() {
 }
 
 function renderDashboard() {
-  const data = state.data.dashboard || { counts: {}, recent_events: [] };
+  const data = state.data.dashboard || { counts: {}, recent_events: [], finance: {}, upcoming_events: [] };
+  const finance = data.finance || {};
   const content = el(`
     <div class="grid">
       <div class="grid stats">
@@ -197,6 +205,8 @@ function renderDashboard() {
           ["templates", "Шаблоны"],
           ["knowledge", "Знания"],
           ["tasks", "Задачи"],
+          ["payments_open", "Платежи"],
+          ["events_week", "События"],
         ]
           .map(
             ([key, label]) => `
@@ -208,7 +218,29 @@ function renderDashboard() {
           .join("")}
       </div>
       <div class="panel">
-        <h2>Последние события</h2>
+        <h2>Финансы (оплаченные)</h2>
+        <p class="muted">Приход: ${finance.income_paid ?? 0} · Расход: ${finance.expense_paid ?? 0} · Баланс: ${finance.balance_paid ?? 0}</p>
+      </div>
+      <div class="panel">
+        <h2>Ближайшие события</h2>
+        <table class="table">
+          <thead><tr><th>Когда</th><th>Событие</th><th>Тип</th></tr></thead>
+          <tbody>
+            ${(data.upcoming_events || [])
+              .map(
+                (item) => `
+              <tr>
+                <td>${formatDate(item.starts_at)}</td>
+                <td>${item.title}</td>
+                <td>${item.event_type}</td>
+              </tr>`
+              )
+              .join("") || `<tr><td colspan="3" class="muted">Нет событий на неделю</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <h2>Последние события журнала</h2>
         <table class="table">
           <thead><tr><th>Когда</th><th>Событие</th><th>Тип</th></tr></thead>
           <tbody>
@@ -763,6 +795,165 @@ function renderTasks() {
   });
 }
 
+function renderFinance() {
+  const items = state.data.payments || [];
+  const summary = state.data.financeSummary || {};
+  const content = el(`
+    <div class="grid">
+      <div class="panel">
+        <h2>Сводка</h2>
+        <p class="muted">Приход: ${summary.income_paid ?? 0} · Расход: ${summary.expense_paid ?? 0} · Баланс: ${summary.balance_paid ?? 0} · Открытых: ${summary.open_payments ?? 0}</p>
+        <h2>Новый платёж</h2>
+        <form id="payment-form" class="form-grid">
+          <input class="full" name="title" placeholder="Название" required />
+          <select name="direction">
+            <option value="income">Приход</option>
+            <option value="expense">Расход</option>
+          </select>
+          <select name="kind">
+            <option value="advance">Аванс</option>
+            <option value="act">Акт</option>
+            <option value="invoice">Счёт</option>
+            <option value="material">Материалы</option>
+            <option value="salary">Зарплата</option>
+            <option value="other">Прочее</option>
+          </select>
+          <input name="amount" type="number" min="0.01" step="0.01" placeholder="Сумма" required />
+          <input name="due_on" type="date" />
+          <textarea class="full" name="description" rows="2" placeholder="Комментарий"></textarea>
+          <div class="full actions"><button type="submit">Создать</button></div>
+        </form>
+      </div>
+      <div class="panel">
+        <table class="table">
+          <thead><tr><th>Платёж</th><th>Сумма</th><th>Статус</th><th></th></tr></thead>
+          <tbody>
+            ${items
+              .map(
+                (item) => `
+              <tr>
+                <td>${item.title}<div class="muted">${item.direction} · ${item.kind}</div></td>
+                <td>${item.amount} ${item.currency}</td>
+                <td>${item.status}</td>
+                <td>
+                  ${item.status !== "paid" ? `<button class="secondary" data-paid="${item.id}">Оплачен</button>` : ""}
+                  <button class="secondary" data-archive="${item.id}">Архив</button>
+                </td>
+              </tr>`
+              )
+              .join("") || `<tr><td colspan="4" class="muted">Платежей пока нет</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `);
+  renderShell(content);
+  document.getElementById("page-title").textContent = "Финансы";
+  content.querySelector("#payment-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.target);
+    await api("/finance/payments", {
+      method: "POST",
+      body: JSON.stringify({
+        title: form.get("title"),
+        direction: form.get("direction"),
+        kind: form.get("kind"),
+        amount: Number(form.get("amount")),
+        due_on: form.get("due_on") || null,
+        description: form.get("description") || null,
+      }),
+    });
+    await safeLoad();
+  });
+  content.querySelectorAll("[data-paid]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await api(`/finance/payments/${button.dataset.paid}/paid`, { method: "POST" });
+      await safeLoad();
+    });
+  });
+  content.querySelectorAll("[data-archive]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await api(`/finance/payments/${button.dataset.archive}/archive`, { method: "POST" });
+      await safeLoad();
+    });
+  });
+}
+
+function renderCalendar() {
+  const items = state.data.calendar || [];
+  const defaultStart = new Date();
+  defaultStart.setDate(defaultStart.getDate() + 1);
+  defaultStart.setMinutes(0, 0, 0);
+  const localValue = new Date(defaultStart.getTime() - defaultStart.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+  const content = el(`
+    <div class="grid">
+      <div class="panel">
+        <h2>Новое событие</h2>
+        <form id="event-form" class="form-grid">
+          <input class="full" name="title" placeholder="Название" required />
+          <select name="event_type">
+            <option value="meeting">Встреча</option>
+            <option value="site_visit">Выезд</option>
+            <option value="deadline">Срок</option>
+            <option value="payment">Оплата</option>
+            <option value="document">Документ</option>
+            <option value="other">Прочее</option>
+          </select>
+          <input name="starts_at" type="datetime-local" value="${localValue}" required />
+          <input class="full" name="location" placeholder="Место" />
+          <textarea class="full" name="description" rows="2" placeholder="Описание"></textarea>
+          <div class="full actions"><button type="submit">Добавить</button></div>
+        </form>
+      </div>
+      <div class="panel">
+        <table class="table">
+          <thead><tr><th>Когда</th><th>Событие</th><th>Тип</th><th></th></tr></thead>
+          <tbody>
+            ${items
+              .map(
+                (item) => `
+              <tr>
+                <td>${formatDate(item.starts_at)}</td>
+                <td>${item.title}<div class="muted">${item.location || ""}</div></td>
+                <td>${item.event_type}</td>
+                <td><button class="secondary" data-archive="${item.id}">Архив</button></td>
+              </tr>`
+              )
+              .join("") || `<tr><td colspan="4" class="muted">Ближайших событий нет</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `);
+  renderShell(content);
+  document.getElementById("page-title").textContent = "Календарь";
+  content.querySelector("#event-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.target);
+    const startsAt = new Date(String(form.get("starts_at")));
+    await api("/calendar/events", {
+      method: "POST",
+      body: JSON.stringify({
+        title: form.get("title"),
+        event_type: form.get("event_type"),
+        starts_at: startsAt.toISOString(),
+        ends_at: new Date(startsAt.getTime() + 60 * 60 * 1000).toISOString(),
+        location: form.get("location") || null,
+        description: form.get("description") || null,
+      }),
+    });
+    await safeLoad();
+  });
+  content.querySelectorAll("[data-archive]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await api(`/calendar/events/${button.dataset.archive}/archive`, { method: "POST" });
+      await safeLoad();
+    });
+  });
+}
+
 function render() {
   if (!state.token) {
     renderLogin();
@@ -782,6 +973,8 @@ function render() {
     templates: renderTemplates,
     documents: renderDocuments,
     tasks: renderTasks,
+    finance: renderFinance,
+    calendar: renderCalendar,
     knowledge: renderKnowledge,
     events: renderEvents,
   };

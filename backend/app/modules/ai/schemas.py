@@ -11,6 +11,8 @@ class AgentName(StrEnum):
     KNOWLEDGE = "knowledge"
     MEMORY = "memory"
     TASK = "task"
+    FINANCE = "finance"
+    CALENDAR = "calendar"
 
 
 class IntentName(StrEnum):
@@ -20,6 +22,11 @@ class IntentName(StrEnum):
     RECALL = "recall"
     CREATE_TASK = "create_task"
     LIST_TASKS = "list_tasks"
+    CREATE_PAYMENT = "create_payment"
+    LIST_PAYMENTS = "list_payments"
+    FINANCE_SUMMARY = "finance_summary"
+    CREATE_EVENT = "create_event"
+    LIST_EVENTS = "list_events"
     HELP = "help"
     UNKNOWN = "unknown"
 

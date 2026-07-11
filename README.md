@@ -18,7 +18,7 @@
 - email: `admin@example.com`
 - password: `change-me`
 
-## Что уже есть (0.5.0-alpha)
+## Что уже есть (0.6.0-alpha)
 
 - Docker: API, PostgreSQL, Redis, MinIO, Qdrant, Ollama, Frontend
 - JWT-авторизация и первый пользователь
@@ -28,8 +28,10 @@
 - Реестр шаблонов, версии, обучение на правках
 - Библиотека блоков договора
 - База знаний + RAG-поиск (Qdrant + embeddings)
-- AI Core: Coordinator, Document / Knowledge / Memory / Task agents
+- AI Core: Coordinator, Document / Knowledge / Memory / Task / Finance / Calendar agents
 - Локальная LLM (Ollama) + опциональный OmniRoute (hybrid)
+- **Финансы**: платежи, статусы, сводка приход/расход
+- **Календарь**: встречи, выезды, сроки
 - Задачи и корпоративная память
 - Журнал событий
 - Чат помощника в UI
@@ -40,6 +42,10 @@
 - `найди ГОСТ`
 - `что говорит про гарантийный срок`
 - `добавь задачу подписать акт`
+- `добавь платёж аванс 150000`
+- `баланс`
+- `добавь встречу завтра с заказчиком`
+- `что в календаре`
 - `запомни: гарантия всегда 24 месяца`
 
 Подробности: [docs/ROADMAP.md](docs/ROADMAP.md), [docs/PROJECT.md](docs/PROJECT.md), [docs/LLM.md](docs/LLM.md), [docs/RAG.md](docs/RAG.md), [docs/SAMPLES.md](docs/SAMPLES.md).

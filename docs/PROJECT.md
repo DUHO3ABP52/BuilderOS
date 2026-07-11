@@ -10,13 +10,15 @@
 4. Каждое изменение документа версионируется и объясняется.
 5. Документы собираются из блоков и шаблонов, а не генерируются «с нуля».
 
-## Текущий контур (0.5.0-alpha)
+## Текущий контур (0.6.0-alpha)
 
 - Auth, Companies, Projects, Documents, Templates, Blocks
 - Knowledge + RAG (Qdrant)
 - AI Core + локальная LLM
 - Импорт образцов (DOCX/PDF/фото) → шаблон
 - Обучение Memory на правках шаблонов
+- Финансы: платежи, сводка, Finance Agent
+- Календарь: события, ближайшие даты, Calendar Agent
 - Tasks, Audit, Dashboard
 
 Документация: [ROADMAP.md](ROADMAP.md), [RAG.md](RAG.md), [SAMPLES.md](SAMPLES.md), [LLM.md](LLM.md).

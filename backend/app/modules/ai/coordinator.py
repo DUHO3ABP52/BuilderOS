@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.modules.ai.agents import document_agent, knowledge_agent, memory_agent, task_agent
+from app.modules.ai.agents import calendar_agent, document_agent, finance_agent, knowledge_agent, memory_agent, task_agent
 from app.modules.ai import llm_assist
 from app.modules.ai.schemas import AgentName, AssistantAction, AssistantRequest, AssistantResponse, IntentName
 from app.modules.events.models import AuditAction
@@ -20,6 +20,20 @@ def classify_intent(message: str) -> IntentName:
         return IntentName.REMEMBER
     if any(token in text for token in ["что ты помнишь", "вспомни", "память"]):
         return IntentName.RECALL
+    if any(token in text for token in ["баланс", "сводка по финанс", "финансов", "сколько получили", "сколько потратили"]):
+        return IntentName.FINANCE_SUMMARY
+    if any(token in text for token in ["платёж", "платеж", "оплат", "аванс", "счет на", "счёт на"]):
+        if any(token in text for token in ["покажи", "список", "открыт", "ожида"]):
+            return IntentName.LIST_PAYMENTS
+        if any(token in text for token in ["добавь", "создай", "запиши", "внеси"]):
+            return IntentName.CREATE_PAYMENT
+        return IntentName.LIST_PAYMENTS
+    if any(token in text for token in ["календар", "встреч", "событи", "выезд", "созвон"]):
+        if any(token in text for token in ["покажи", "список", "ближайш", "что на"]):
+            return IntentName.LIST_EVENTS
+        if any(token in text for token in ["добавь", "создай", "поставь", "назначь"]):
+            return IntentName.CREATE_EVENT
+        return IntentName.LIST_EVENTS
     if any(token in text for token in ["задач", "напомни", "todo", "сделать список"]):
         if any(token in text for token in ["покажи", "список", "открыт"]):
             return IntentName.LIST_TASKS
@@ -64,10 +78,12 @@ def handle_assistant(session: Session, user_id: UUID, payload: AssistantRequest)
         return AssistantResponse(
             reply=(
                 "Я координатор BuilderOS. Могу:\n"
-                "• подготовить документ из шаблона («сделай договор»)\n"
+                "• подготовить документ («сделай договор»)\n"
                 "• искать по базе знаний («найди СП»)\n"
-                "• создавать задачи («добавь задачу подписать акт»)\n"
-                "• запоминать факты («запомни: гарантия всегда 24 месяца»)"
+                "• задачи («добавь задачу…»)\n"
+                "• платежи («добавь платёж аванс 150000», «баланс»)\n"
+                "• календарь («добавь встречу завтра», «что в календаре»)\n"
+                "• память («запомни: …»)"
             ),
             intent=intent,
             agent=AgentName.COORDINATOR,
@@ -85,13 +101,23 @@ def handle_assistant(session: Session, user_id: UUID, payload: AssistantRequest)
         return _handle_create_task(session, user_id, payload)
     if intent == IntentName.LIST_TASKS:
         return _handle_list_tasks(session)
+    if intent == IntentName.CREATE_PAYMENT:
+        return _handle_create_payment(session, user_id, payload)
+    if intent == IntentName.LIST_PAYMENTS:
+        return _handle_list_payments(session)
+    if intent == IntentName.FINANCE_SUMMARY:
+        return _handle_finance_summary(session)
+    if intent == IntentName.CREATE_EVENT:
+        return _handle_create_event(session, user_id, payload)
+    if intent == IntentName.LIST_EVENTS:
+        return _handle_list_events(session)
 
     hint = llm_assist.draft_clarification(payload.message)
     return AssistantResponse(
         reply=hint
         or (
             "Не уверен, что сделать. Попробуйте: «сделай договор», «найди ГОСТ», "
-            "«добавь задачу…» или «запомни…». Напишите «помощь» для списка команд."
+            "«добавь платёж…», «добавь встречу завтра» или «помощь»."
         ),
         intent=IntentName.UNKNOWN,
         agent=AgentName.COORDINATOR,
@@ -345,4 +371,134 @@ def _handle_list_tasks(session: Session) -> AssistantResponse:
         intent=IntentName.LIST_TASKS,
         agent=AgentName.TASK,
         data={"tasks": [{"id": str(task.id), "title": task.title, "status": task.status} for task in tasks[:15]]},
+    )
+
+
+def _handle_create_payment(session: Session, user_id: UUID, payload: AssistantRequest) -> AssistantResponse:
+    try:
+        payment = finance_agent.create_payment_from_text(session, payload.message, user_id, payload.project_id)
+    except ValueError as error:
+        return AssistantResponse(
+            reply=str(error),
+            intent=IntentName.CREATE_PAYMENT,
+            agent=AgentName.FINANCE,
+            status="needs_data",
+            missing_fields=["amount"],
+        )
+    log_event(
+        session,
+        actor_id=user_id,
+        entity_type="payment",
+        entity_id=payment.id,
+        action=AuditAction.CREATE,
+        summary=f"AI создал платёж: {payment.title}",
+    )
+    session.commit()
+    return AssistantResponse(
+        reply=f"Создал платёж «{payment.title}»: {payment.amount} {payment.currency} ({payment.direction}).",
+        intent=IntentName.CREATE_PAYMENT,
+        agent=AgentName.FINANCE,
+        data={
+            "payment_id": str(payment.id),
+            "amount": float(payment.amount),
+            "direction": payment.direction,
+            "status": payment.status,
+        },
+    )
+
+
+def _handle_list_payments(session: Session) -> AssistantResponse:
+    payments = finance_agent.open_payments(session)
+    if not payments:
+        return AssistantResponse(
+            reply="Открытых платежей нет.",
+            intent=IntentName.LIST_PAYMENTS,
+            agent=AgentName.FINANCE,
+            status="empty",
+        )
+    lines = [f"• [{item.status}] {item.title}: {item.amount} {item.currency}" for item in payments[:15]]
+    return AssistantResponse(
+        reply="Открытые платежи:\n" + "\n".join(lines),
+        intent=IntentName.LIST_PAYMENTS,
+        agent=AgentName.FINANCE,
+        data={
+            "payments": [
+                {
+                    "id": str(item.id),
+                    "title": item.title,
+                    "amount": float(item.amount),
+                    "status": item.status,
+                    "direction": item.direction,
+                }
+                for item in payments[:15]
+            ]
+        },
+    )
+
+
+def _handle_finance_summary(session: Session) -> AssistantResponse:
+    summary = finance_agent.summary(session)
+    return AssistantResponse(
+        reply=(
+            "Финансовая сводка (оплаченные):\n"
+            f"• Приход: {summary['income_paid']} RUB\n"
+            f"• Расход: {summary['expense_paid']} RUB\n"
+            f"• Баланс: {summary['balance_paid']} RUB\n"
+            f"• Открытых платежей: {summary['open_payments']}"
+        ),
+        intent=IntentName.FINANCE_SUMMARY,
+        agent=AgentName.FINANCE,
+        data={key: float(value) if hasattr(value, "as_tuple") else value for key, value in summary.items()},
+    )
+
+
+def _handle_create_event(session: Session, user_id: UUID, payload: AssistantRequest) -> AssistantResponse:
+    event = calendar_agent.create_event_from_text(session, payload.message, user_id, payload.project_id)
+    log_event(
+        session,
+        actor_id=user_id,
+        entity_type="calendar_event",
+        entity_id=event.id,
+        action=AuditAction.CREATE,
+        summary=f"AI создал событие: {event.title}",
+    )
+    session.commit()
+    return AssistantResponse(
+        reply=f"Добавил в календарь: «{event.title}» на {event.starts_at.isoformat()}.",
+        intent=IntentName.CREATE_EVENT,
+        agent=AgentName.CALENDAR,
+        data={
+            "event_id": str(event.id),
+            "title": event.title,
+            "starts_at": event.starts_at.isoformat(),
+            "event_type": event.event_type,
+        },
+    )
+
+
+def _handle_list_events(session: Session) -> AssistantResponse:
+    events = calendar_agent.list_upcoming(session)
+    if not events:
+        return AssistantResponse(
+            reply="Ближайших событий нет.",
+            intent=IntentName.LIST_EVENTS,
+            agent=AgentName.CALENDAR,
+            status="empty",
+        )
+    lines = [f"• {item.starts_at.date().isoformat()} [{item.event_type}] {item.title}" for item in events[:15]]
+    return AssistantResponse(
+        reply="Ближайшие события:\n" + "\n".join(lines),
+        intent=IntentName.LIST_EVENTS,
+        agent=AgentName.CALENDAR,
+        data={
+            "events": [
+                {
+                    "id": str(item.id),
+                    "title": item.title,
+                    "starts_at": item.starts_at.isoformat(),
+                    "event_type": item.event_type,
+                }
+                for item in events[:15]
+            ]
+        },
     )
