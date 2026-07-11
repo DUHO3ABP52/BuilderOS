@@ -74,3 +74,14 @@ def test_assistant_document_needs_data_then_create(client: TestClient, auth_head
     result = created.json()
     assert result["status"] == "ok"
     assert result["data"]["document_id"]
+
+
+def test_llm_status_when_disabled(client: TestClient, auth_headers: dict[str, str]) -> None:
+    response = client.get("/api/v1/ai/llm-status", headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["enabled"] is False
+    assert body["provider_status"] == "disabled"
+    assert body["model_ready"] is False
+    assert "warmup" in body
+    assert "endpoints" in body

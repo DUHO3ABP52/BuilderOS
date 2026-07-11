@@ -74,6 +74,11 @@ async function loadView() {
         text: "Я координатор BuilderOS. Напишите «сделай договор», «найди ГОСТ», «добавь задачу…» или «помощь».",
       },
     ];
+    try {
+      state.data.llm = await api("/ai/llm-status");
+    } catch (_) {
+      state.data.llm = null;
+    }
   } else if (state.view === "tasks") {
     state.data.tasks = await api("/tasks");
   }
@@ -538,11 +543,24 @@ function renderEvents() {
 
 function renderAssistant() {
   const chat = state.data.chat || [];
+  const llm = state.data.llm;
+  let llmLine = "LLM: статус неизвестен";
+  if (llm) {
+    if (!llm.enabled) llmLine = "LLM: выключена (работают только правила)";
+    else if (llm.model_ready || llm.provider_status === "ok") {
+      const ep = (llm.endpoints || []).find((item) => item.status === "ok");
+      llmLine = `LLM: готова · ${llm.provider} · ${ep ? ep.model : llm.model}`;
+    } else {
+      const warm = (llm.warmup && llm.warmup.detail) || llm.provider_status;
+      llmLine = `LLM: загружается… (${warm})`;
+    }
+  }
   const content = el(`
     <div class="grid">
       <div class="panel">
         <h2>Координатор</h2>
-        <p class="muted">Локальные агенты: Document, Knowledge, Memory, Task. Без выдуманных данных.</p>
+        <p class="muted">Локальные агенты + LLM. Документы только из шаблонов, без выдуманных данных.</p>
+        <p class="muted">${llmLine}</p>
         <div class="chat" id="chat-box">
           ${chat
             .map(
@@ -589,6 +607,9 @@ function renderAssistant() {
       text: answer.reply,
       meta: `${answer.agent} · ${answer.intent} · ${answer.status}`,
     });
+    try {
+      state.data.llm = await api("/ai/llm-status");
+    } catch (_) {}
     renderAssistant();
   });
 }

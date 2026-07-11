@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.modules.ai.agents import document_agent, knowledge_agent, memory_agent, task_agent
+from app.modules.ai import llm_assist
 from app.modules.ai.schemas import AgentName, AssistantAction, AssistantRequest, AssistantResponse, IntentName
 from app.modules.events.models import AuditAction
 from app.modules.events.service import log_event
@@ -37,6 +38,17 @@ def classify_intent(message: str) -> IntentName:
     return IntentName.UNKNOWN
 
 
+def resolve_intent(message: str) -> tuple[IntentName, str | None]:
+    """Сначала правила (быстро и предсказуемо), LLM — только для неизвестных фраз."""
+    intent = classify_intent(message)
+    if intent != IntentName.UNKNOWN:
+        return intent, None
+    llm_result = llm_assist.classify_intent_with_llm(message)
+    if llm_result is None:
+        return IntentName.UNKNOWN, None
+    return llm_result[0], llm_result[1]
+
+
 def _extract_after(message: str, markers: list[str]) -> str:
     lower = message.lower()
     for marker in markers:
@@ -47,7 +59,7 @@ def _extract_after(message: str, markers: list[str]) -> str:
 
 
 def handle_assistant(session: Session, user_id: UUID, payload: AssistantRequest) -> AssistantResponse:
-    intent = classify_intent(payload.message)
+    intent, llm_query = resolve_intent(payload.message)
     if intent == IntentName.HELP:
         return AssistantResponse(
             reply=(
@@ -64,7 +76,7 @@ def handle_assistant(session: Session, user_id: UUID, payload: AssistantRequest)
     if intent == IntentName.CREATE_DOCUMENT:
         return _handle_document(session, user_id, payload)
     if intent == IntentName.SEARCH_KNOWLEDGE:
-        return _handle_knowledge(session, user_id, payload)
+        return _handle_knowledge(session, user_id, payload, llm_query=llm_query)
     if intent == IntentName.REMEMBER:
         return _handle_remember(session, user_id, payload)
     if intent == IntentName.RECALL:
@@ -74,8 +86,10 @@ def handle_assistant(session: Session, user_id: UUID, payload: AssistantRequest)
     if intent == IntentName.LIST_TASKS:
         return _handle_list_tasks(session)
 
+    hint = llm_assist.draft_clarification(payload.message)
     return AssistantResponse(
-        reply=(
+        reply=hint
+        or (
             "Не уверен, что сделать. Попробуйте: «сделай договор», «найди ГОСТ», "
             "«добавь задачу…» или «запомни…». Напишите «помощь» для списка команд."
         ),
@@ -171,9 +185,21 @@ def _handle_document(session: Session, user_id: UUID, payload: AssistantRequest)
     )
 
 
-def _handle_knowledge(session: Session, user_id: UUID, payload: AssistantRequest) -> AssistantResponse:
-    query = _extract_after(payload.message, ["найди", "поиск", "что говорит", "база знаний"])
-    query = re.sub(r"^(в\s+)?(базе\s+знаний|сп|снип|гост)\s*", "", query, flags=re.IGNORECASE).strip() or payload.message
+def _handle_knowledge(
+    session: Session,
+    user_id: UUID,
+    payload: AssistantRequest,
+    *,
+    llm_query: str | None = None,
+) -> AssistantResponse:
+    if llm_query:
+        query = llm_query
+    else:
+        query = _extract_after(payload.message, ["найди", "поиск", "что говорит", "база знаний"])
+        query = (
+            re.sub(r"^(в\s+)?(базе\s+знаний|сп|снип|гост)\s*", "", query, flags=re.IGNORECASE).strip()
+            or payload.message
+        )
     items = knowledge_agent.search_knowledge(session, query)
     log_event(
         session,
@@ -194,12 +220,15 @@ def _handle_knowledge(session: Session, user_id: UUID, payload: AssistantRequest
             data={"query": query},
         )
     lines = [f"• {item.title} [{item.category}]" for item in items[:8]]
+    synthesized = llm_assist.synthesize_knowledge_answer(query, items)
+    reply = synthesized if synthesized else ("Нашёл в базе знаний:\n" + "\n".join(lines))
     return AssistantResponse(
-        reply="Нашёл в базе знаний:\n" + "\n".join(lines),
+        reply=reply,
         intent=IntentName.SEARCH_KNOWLEDGE,
         agent=AgentName.KNOWLEDGE,
         data={
             "query": query,
+            "llm_used": bool(synthesized),
             "items": [
                 {"id": str(item.id), "title": item.title, "category": item.category, "excerpt": item.content[:240]}
                 for item in items[:8]

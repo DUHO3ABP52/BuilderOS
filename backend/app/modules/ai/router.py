@@ -6,6 +6,7 @@ from app.modules.ai.coordinator import handle_assistant
 from app.modules.ai.schemas import AssistantRequest, AssistantResponse
 from app.modules.auth.deps import get_current_user
 from app.modules.auth.models import User
+from app.services import llm as llm_service
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -17,3 +18,8 @@ def ask_assistant(
     user: User = Depends(get_current_user),
 ) -> AssistantResponse:
     return handle_assistant(session, user.id, payload)
+
+
+@router.get("/llm-status")
+def llm_status(_: User = Depends(get_current_user)) -> dict:
+    return llm_service.status_payload()

@@ -6,9 +6,12 @@
 ## Быстрый запуск
 
 1. Скопируйте `.env.example` в `.env` и задайте безопасные пароли.
-2. Выполните `docker compose up --build`.
+2. Выполните `docker compose up --build` — вместе поднимутся приложение и Ollama (модель скачается сама).
 3. Откройте UI: `http://localhost:3000`
 4. API / Swagger: `http://localhost:8000/docs`
+
+Опционально бесплатный cloud-gateway: `docker compose --profile omniroute up --build`  
+(см. [docs/LLM.md](docs/LLM.md), [OmniRoute](https://github.com/diegosouzapw/OmniRoute)).
 
 Учётная запись по умолчанию (из `.env`):
 
@@ -17,7 +20,7 @@
 
 ## Что уже есть (0.3.0-alpha)
 
-- Docker: API, PostgreSQL, Redis, MinIO, Qdrant, Frontend
+- Docker: API, PostgreSQL, Redis, MinIO, Qdrant, Ollama, Frontend
 - JWT-авторизация и первый пользователь
 - Компании и строительные объекты с архивированием
 - Document Engine: `BuilderDocument`, секции, переменные, DOCX/PDF/HTML
@@ -25,6 +28,7 @@
 - Библиотека блоков договора
 - База знаний + поиск через Knowledge Agent
 - AI Core: Coordinator, Document / Knowledge / Memory / Task agents
+- Локальная LLM (Ollama) + опциональный OmniRoute (hybrid)
 - Задачи и корпоративная память
 - Журнал событий
 - Чат помощника в UI
@@ -36,4 +40,4 @@
 - `добавь задачу подписать акт`
 - `запомни: гарантия всегда 24 месяца`
 
-Подробности: [docs/ROADMAP.md](docs/ROADMAP.md), [docs/PROJECT.md](docs/PROJECT.md).
+Подробности: [docs/ROADMAP.md](docs/ROADMAP.md), [docs/PROJECT.md](docs/PROJECT.md), [docs/LLM.md](docs/LLM.md).

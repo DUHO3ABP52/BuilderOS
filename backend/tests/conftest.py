@@ -13,6 +13,7 @@ os.environ["APP_ENV"] = "test"
 os.environ["REDIS_URL"] = "redis://localhost:6379/15"
 os.environ["QDRANT_HOST"] = "localhost"
 os.environ["MINIO_ENDPOINT"] = "localhost:9000"
+os.environ["LLM_ENABLED"] = "false"
 
 import pytest
 from fastapi.testclient import TestClient

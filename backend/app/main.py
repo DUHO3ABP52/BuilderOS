@@ -9,7 +9,8 @@ from app.db.base import Base
 from app.db.session import SessionLocal, engine
 import app.db.models  # noqa: F401
 from app.modules.auth.service import ensure_first_user
-from app.services.infrastructure import check_qdrant, check_redis
+from app.services import llm as llm_service
+from app.services.infrastructure import check_llm, check_qdrant, check_redis
 from app.services.seed import seed_default_blocks
 from app.services.storage import check_minio
 
@@ -27,6 +28,7 @@ async def lifespan(_: FastAPI):
         raise
     finally:
         session.close()
+    llm_service.start_llm_warmup_background()
     yield
 
 
@@ -59,4 +61,5 @@ def health() -> dict[str, str]:
         "redis": check_redis(),
         "qdrant": check_qdrant(),
         "minio": check_minio(),
+        "llm": check_llm(),
     }

@@ -1,4 +1,5 @@
 from app.core.config import settings
+from app.services import llm as llm_service
 
 
 def check_redis() -> str:
@@ -21,3 +22,7 @@ def check_qdrant() -> str:
         return "ok"
     except Exception:
         return "unavailable"
+
+
+def check_llm() -> str:
+    return llm_service.check_llm()

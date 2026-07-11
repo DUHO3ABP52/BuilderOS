@@ -24,6 +24,23 @@ class Settings(BaseSettings):
     minio_bucket: str = "builderos"
     minio_secure: bool = False
 
+    # Локальная LLM (Ollama) + опциональный OmniRoute / OpenAI-compatible
+    llm_enabled: bool = True
+    llm_provider: str = "hybrid"  # ollama | omniroute | hybrid
+    llm_base_url: str = "http://localhost:11434"
+    llm_model: str = "qwen2.5:7b"
+    llm_api_key: str = ""
+    llm_timeout_seconds: float = 60.0
+    llm_temperature: float = 0.2
+    llm_max_tokens: int = 1024
+    llm_auto_pull: bool = True
+    # Fallback / OmniRoute (бесплатные провайдеры через локальный gateway)
+    llm_fallback_base_url: str = "http://localhost:20128"
+    llm_fallback_model: str = "auto/cheap"
+    llm_fallback_api_key: str = ""
+    # Фрагменты базы знаний уходят в облако только при явном разрешении
+    llm_cloud_for_knowledge: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
